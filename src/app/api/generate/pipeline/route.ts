@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Pick the least-recently-used template for round-robin variety
-    let selectedPoolTemplate: (typeof userTemplates extends (infer T)[] ? T : never) | null = null
+    let selectedPoolTemplate: any = null
     if (userTemplates?.length) {
       const { data: recentMeta } = await supabase
         .from('posts')
