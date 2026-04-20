@@ -122,7 +122,7 @@ export function Nav({ theme, scrolled, onThemeChange, onCTA }: NavProps) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <LangToggle lang={lang} onChange={setLang} />
                 <ThemeToggle theme={theme} onChange={onThemeChange} />
-                <a href="/login" style={{
+                <a href="https://app.lumen-reach.com/login" style={{
                   fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)',
                   textDecoration: 'none', padding: '8px 14px',
                 }}>{t.nav.signIn}</a>
@@ -156,7 +156,7 @@ export function Nav({ theme, scrolled, onThemeChange, onCTA }: NavProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <LangToggle lang={lang} onChange={setLang} />
               <ThemeToggle theme={theme} onChange={onThemeChange} />
-              <a href="/login" onClick={closeMenu} style={{
+              <a href="https://app.lumen-reach.com/login" onClick={closeMenu} style={{
                 fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)',
                 textDecoration: 'none', marginLeft: 4,
               }}>{t.nav.signIn}</a>
