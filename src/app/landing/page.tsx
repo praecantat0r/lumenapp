@@ -13,7 +13,6 @@ import { Testimonials } from './_components/Testimonials'
 import { Pricing } from './_components/Pricing'
 import { FAQ } from './_components/FAQ'
 import { Footer } from './_components/Footer'
-import { TweaksPanel } from './_components/Tweaks'
 
 const TWEAK_DEFAULTS = {
   heroVariant: 'B' as 'A' | 'B',
@@ -43,7 +42,6 @@ function App() {
       ? (localStorage.getItem('lumen-theme') ?? 'light')
       : 'light',
   }))
-  const [tweaksOpen, setTweaksOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   // apply theme to <html> and persist
@@ -103,31 +101,6 @@ function App() {
 
       <Footer onCTA={scrollToPricing} />
 
-      <TweaksPanel
-        open={tweaksOpen}
-        state={state}
-        onChange={update}
-        onClose={() => setTweaksOpen(false)}
-      />
-
-      {/* Tweaks trigger button */}
-      <button
-        onClick={() => setTweaksOpen(o => !o)}
-        title="Tweaks"
-        style={{
-          position: 'fixed', bottom: 24, left: 24, zIndex: 99,
-          width: 38, height: 38, borderRadius: '50%',
-          background: 'var(--surface-2)', border: '1px solid var(--border)',
-          color: 'var(--sand)', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 2px 16px rgba(0,0,0,0.2)',
-          transition: 'border-color .15s, color .15s',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,.4)'; e.currentTarget.style.color = 'var(--candle)' }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>tune</span>
-      </button>
     </>
   )
 }

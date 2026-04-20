@@ -3,7 +3,6 @@ import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
-import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -39,7 +38,6 @@ export default function RootLayout({
       <body>
         <Script src="/theme-init.js" strategy="beforeInteractive" />
         {children}
-        <ThemeToggle />
         <Toaster
           position="bottom-right"
           toastOptions={{
