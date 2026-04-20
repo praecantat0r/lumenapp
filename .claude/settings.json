@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "c:\\Users\\Acer\\Desktop\\prodzekt\\Lumen\\src\\app\\api\\product-photos\\[id]"
+    ],
+    "allow": [
+      "Bash(wc -l c:\\\\\\\\Users\\\\\\\\Acer\\\\\\\\Desktop\\\\\\\\prodzekt\\\\\\\\Lumen\\\\\\\\src\\\\\\\\components\\\\\\\\dashboard\\\\\\\\ProductPhotosClient.tsx c:\\\\\\\\Users\\\\\\\\Acer\\\\\\\\Desktop\\\\\\\\prodzekt\\\\\\\\Lumen\\\\\\\\src\\\\\\\\lib\\\\\\\\anthropic.ts)"
+    ]
+  }
+}

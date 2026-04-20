@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@theme {
+  --color-carbon:    #0e0e0d;
+  --color-candle:    #b68d40;
+  --color-ember:     #7b580d;
+  --color-parchment: #fcf9f4;
+  --color-sand:      #c9c2b5;
+  --color-surface:   #141412;
+  --color-surface-2: #1c1c19;
+  --color-border:    #4e4538;
+}
+
+:root {
+  --carbon:    #0e0e0d;
+  --candle:    #b68d40;
+  --ember:     #7b580d;
+  --parchment: #fcf9f4;
+  --sand:      #c9c2b5;
+  --surface:   #141412;
+  --surface-2: #1c1c19;
+  --surface-3: #282723;
+  --border:      rgba(78, 69, 56, 0.35);
+  --border-soft: rgba(78, 69, 56, 0.15);
+  --border-hard: rgba(78, 69, 56, 0.65);
+  --muted:       rgba(201, 194, 181, 0.42);
+  --error:       #ffb4ab;
+
+  /* Font aliases — resolved from Next.js font variables at runtime */
+  --font-syne: var(--font-headline);
+  --font-ibm:  var(--font-body);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--carbon);
+  color: var(--parchment);
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(78,69,56,0.5); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(182,141,64,0.4); }
+
+/* Ambient top glow utility */
+.candle-glow {
+  background: radial-gradient(ellipse at top, rgba(182,141,64,0.07) 0%, transparent 60%);
+}
+
+/* ── Light theme overrides ─────────────────────────────────────── */
+/*
+   Palette: "The Digital Editorial" (per Lumen Ivory spec)
+   Canvas  #fcf9f4 — Ivory White  — page bg, headers, workspace
+   Surface #f6f3ee — Sand Pearl   — sidebar, cards, secondary panels
+   Gold    #b68d40 — Lumen Gold   — primary CTA / accent
+   Ochre   #7b580d — Deep Ochre   — hover / active accent
+   Text    #1a1a1a — Off-Black    — primary text
+   Sub     #4e4538 — Warm Umber   — secondary text
+   Border  rgba(78,69,56,0.10)    — Subtle Tonal Stroke
+*/
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+[data-theme="light"] {
+  --color-carbon:    #fcf9f4;
+  --color-surface:   #f6f3ee;   /* Sand Pearl — sidebar, cards */
+  --color-surface-2: #f6f3ee;
+  --color-border:    #d2c5b3;   /* Tailwind class fallback */
+  --color-parchment: #1a1a1a;   /* Off-Black */
+  --color-sand:      #4e4538;   /* Warm Umber */
+
+  --carbon:    #fcf9f4;         /* Ivory White canvas */
+  --surface:   #f6f3ee;         /* Sand Pearl */
+  --surface-2: #f6f3ee;         /* same — used for cards/inputs */
+  --surface-3: #ede9e4;         /* active states / deep nesting */
+  --border:    rgba(78, 69, 56, 0.10);  /* Subtle Tonal Stroke */
+  --candle:    #b68d40;         /* Lumen Gold */
+  --ember:     #7b580d;         /* Deep Ochre */
+  --parchment: #1a1a1a;         /* Off-Black */
+  --sand:      #4e4538;         /* Warm Umber */
+  --muted:     #807666;         /* tertiary text */
+  --error:     #ba1a1a;
+}
+
+[data-theme="light"] body {
+  background: #fcf9f4;
+  color: #1a1a1a;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track { background: #f0ece4; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #bfbaa8; }
+
+[data-theme="light"] .candle-glow {
+  background: radial-gradient(ellipse at top, rgba(123,88,13,0.1) 0%, transparent 60%);
+}
+
+/* Smooth theme transition */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+}
