@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') ?? ''
 
   const isRootDomain =
@@ -10,7 +10,7 @@ export async function proxy(request: NextRequest) {
 
   if (isRootDomain) {
     const url = request.nextUrl.clone()
-    if (url.pathname.startsWith('/landing')) {
+    if (url.pathname.startsWith('/landing') || url.pathname.startsWith('/api/')) {
       return NextResponse.next()
     }
     url.pathname = '/landing'
