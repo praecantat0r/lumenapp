@@ -9,10 +9,10 @@ export async function GET(req: NextRequest) {
   const from = new URL(req.url).searchParams.get('from') || 'settings'
   const state = `${user.id}|${from}`
 
-  const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
+  const authUrl = `https://www.instagram.com/oauth/authorize?` +
     `client_id=${process.env.INSTAGRAM_APP_ID}` +
     `&redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_URL + '/api/instagram/callback')}` +
-    `&scope=instagram_basic,instagram_content_publish,instagram_manage_insights,pages_show_list` +
+    `&scope=instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights` +
     `&response_type=code` +
     `&state=${encodeURIComponent(state)}`
 
