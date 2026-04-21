@@ -909,8 +909,8 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       serializing.current = false
 
 
-      canvas.on('selection:created', () => { setSelectedObj(canvas.getActiveObject() ?? null); setRightPanelMinimized(false) })
-      canvas.on('selection:updated', () => { setSelectedObj(canvas.getActiveObject() ?? null); setRightPanelMinimized(false) })
+      canvas.on('selection:created', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
+      canvas.on('selection:updated', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
       canvas.on('selection:cleared', () => setSelectedObj(null))
       canvas.on('object:added',    () => { refreshLayers(); pushUndo() })
       canvas.on('object:removed',  () => { refreshLayers(); pushUndo() })

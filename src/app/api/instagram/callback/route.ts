@@ -73,6 +73,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(successRedirect, process.env.NEXT_PUBLIC_APP_URL!))
   } catch (err) {
     console.error('IG callback error:', err)
-    return NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }
