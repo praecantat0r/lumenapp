@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     const page = (pagesData.data || [])[0]
     const igAccountId = page?.instagram_business_account?.id
 
-    if (!igAccountId) throw new Error('No Instagram Business Account found. Please ensure your Instagram is connected to a Facebook Page.')
+    if (!igAccountId) throw new Error(`No Instagram Business Account found. Pages API returned: ${JSON.stringify(pagesData)}`)
 
     // Get IG username
     const igRes = await fetch(
