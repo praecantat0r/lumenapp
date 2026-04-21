@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell, PieChart, Pie,
@@ -7,33 +7,59 @@ import {
 
 type Period = 7 | 30 | 90
 
-interface StatsData {
-  insights?: Array<{ name: string; values?: Array<{ value: number; end_time: string }> }>
-  media?:    Array<{ id: string; caption?: string; timestamp: string; like_count?: number; comments_count?: number }>
+interface MediaPost {
+  id: string
+  caption?: string
+  timestamp: string
+  like_count?: number
+  comments_count?: number
+  reach?: number
+  impressions?: number
+  saves?: number
 }
 
-const CANDLE = '#D4A84B'; const MUTED = 'rgba(246,242,234,0.28)'
-const BLUE   = '#7AABFF'; const GREEN = '#6EBF8B'; const RED = '#E07070'; const EMBER = '#B5852A'
+interface InsightMetric {
+  name: string
+  values?: Array<{ value: number; end_time: string }>
+}
 
-function fmt(n: number) { return n >= 1000 ? `${(n/1000).toFixed(1)}k` : String(n) }
+interface StatsData {
+  insights?: InsightMetric[]
+  media?: MediaPost[]
+}
 
-const tooltipStyle = { background:'#1c1c19', border:'1px solid rgba(78,69,56,0.4)', borderRadius:12, fontFamily:"'Inter',sans-serif", color:'#fcf9f4', fontSize:12 }
-const axisStyle    = { fill: 'rgba(201,194,181,0.5)', fontSize: 9, fontFamily:"'Inter',sans-serif" }
-
-const MOCK: Record<Period, {
+interface ParsedStats {
   kpi: { followers: string; reach: string; impressions: string; eng: string }
   reachData:    Array<{ date: string; reach: number; prev: number }>
   followData:   Array<{ week: string; new: number; lost: number }>
   engData:      Array<{ post: string; rate: number }>
   sources:      Array<{ name: string; value: number; color: string }>
   topPosts:     Array<{ rank: number; title: string; date: string; reach: number; imp: number; likes: number; comments: number; saves: number; eng: number }>
-}> = {
+  netFollChange: number
+}
+
+const CANDLE = '#D4A84B'; const MUTED = 'rgba(246,242,234,0.28)'
+const BLUE   = '#7AABFF'; const GREEN = '#6EBF8B'; const RED = '#E07070'; const EMBER = '#B5852A'
+
+function fmt(n: number) { return n >= 1_000_000 ? `${(n/1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n/1000).toFixed(1)}k` : String(n) }
+
+const tooltipStyle = { background:'#1c1c19', border:'1px solid rgba(78,69,56,0.4)', borderRadius:12, fontFamily:"'Inter',sans-serif", color:'#fcf9f4', fontSize:12 }
+const axisStyle    = { fill: 'rgba(201,194,181,0.5)', fontSize: 9, fontFamily:"'Inter',sans-serif" }
+
+const MOCK_SOURCES = [
+  {name:'Hashtags',value:38,color:CANDLE},
+  {name:'Home feed',value:31,color:BLUE},
+  {name:'Explore',value:19,color:GREEN},
+  {name:'Profile',value:12,color:EMBER},
+]
+
+const MOCK: Record<Period, ParsedStats> = {
   7: {
     kpi: { followers:'2,841', reach:'18.4k', impressions:'31k', eng:'5.1%' },
     reachData: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i) => ({ date:d, reach:[2100,3400,2800,4200,3600,5812,4900][i], prev:[1800,2900,2200,3100,2900,4200,3800][i] })),
     followData: ['W–4','W–3','W–2','W–1','This'].map((w,i) => ({ week:w, new:[18,24,21,28,31][i], lost:[-4,-6,-3,-8,-5][i] })),
     engData: Array.from({length:10},(_,i)=>({ post:`P${i+1}`, rate:[3.8,5.1,6.4,4.2,4.9,3.2,5.8,4.1,6.1,3.6][i] })),
-    sources: [{name:'Hashtags',value:38,color:CANDLE},{name:'Home feed',value:31,color:BLUE},{name:'Explore',value:19,color:GREEN},{name:'Profile',value:12,color:EMBER}],
+    sources: MOCK_SOURCES,
     topPosts: [
       {rank:1,title:'Spring collection',date:'23 Mar',reach:5812,imp:9240,likes:441,comments:38,saves:87,eng:6.4},
       {rank:2,title:'Quality over noise',date:'26 Mar',reach:3240,imp:5180,likes:312,comments:24,saves:54,eng:5.1},
@@ -41,13 +67,14 @@ const MOCK: Record<Period, {
       {rank:4,title:'Show up every day',date:'20 Mar',reach:2760,imp:4410,likes:224,comments:17,saves:41,eng:4.2},
       {rank:5,title:'Behind the brand',date:'24 Mar',reach:2100,imp:3360,likes:198,comments:11,saves:32,eng:3.8},
     ],
+    netFollChange: 118,
   },
   30: {
     kpi: { followers:'2,841', reach:'84.2k', impressions:'142k', eng:'4.8%' },
     reachData: Array.from({length:30},(_,i)=>{ const d=new Date(2026,2,28); d.setDate(d.getDate()-29+i); return { date:`${d.getDate()}/${d.getMonth()+1}`, reach:[1800,2100,1600,2400,2900,2200,3100,2600,3400,2800,3200,2400,3800,3100,2700,4200,3600,3900,3200,4500,3800,4100,3500,5200,4600,4900,5812,5100,4700,5400][i], prev:[1400,1700,1300,1900,2300,1800,2500,2100,2700,2200,2600,1900,3100,2500,2200,3400,2900,3100,2600,3700,3100,3300,2800,4200,3700,3900,4600,4100,3800,4300][i] } }),
     followData: ['W1','W2','W3','W4'].map((w,i)=>({ week:w, new:[22,31,28,37][i], lost:[-5,-8,-6,-9][i] })),
     engData: Array.from({length:10},(_,i)=>({ post:`P${i+1}`, rate:[3.8,5.1,6.4,4.2,4.9,3.2,5.8,4.1,6.1,3.6][i] })),
-    sources: [{name:'Hashtags',value:38,color:CANDLE},{name:'Home feed',value:31,color:BLUE},{name:'Explore',value:19,color:GREEN},{name:'Profile',value:12,color:EMBER}],
+    sources: MOCK_SOURCES,
     topPosts: [
       {rank:1,title:'Spring collection',date:'23 Mar',reach:5812,imp:9240,likes:441,comments:38,saves:87,eng:6.4},
       {rank:2,title:'Quality over noise',date:'26 Mar',reach:3240,imp:5180,likes:312,comments:24,saves:54,eng:5.1},
@@ -55,19 +82,144 @@ const MOCK: Record<Period, {
       {rank:4,title:'Show up every day',date:'20 Mar',reach:2760,imp:4410,likes:224,comments:17,saves:41,eng:4.2},
       {rank:5,title:'Behind the brand',date:'24 Mar',reach:2100,imp:3360,likes:198,comments:11,saves:32,eng:3.8},
     ],
+    netFollChange: 118,
   },
   90: {
     kpi: { followers:'2,841', reach:'248k', impressions:'412k', eng:'4.4%' },
     reachData: Array.from({length:12},(_,i)=>({ date:`W${i+1}`, reach:[12000,14500,11800,16200,15400,18900,17200,20100,19400,22600,24100,26800][i], prev:[9800,11200,9400,13100,12400,15200,13900,16400,15800,18200,19500,21600][i] })),
     followData: ['Jan','Feb','Mar'].map((w,i)=>({ week:w, new:[68,84,118][i], lost:[-18,-22,-28][i] })),
     engData: Array.from({length:10},(_,i)=>({ post:`P${i+1}`, rate:[3.4,4.8,5.9,3.8,4.5,2.9,5.2,3.7,5.6,3.3][i] })),
-    sources: [{name:'Hashtags',value:38,color:CANDLE},{name:'Home feed',value:31,color:BLUE},{name:'Explore',value:19,color:GREEN},{name:'Profile',value:12,color:EMBER}],
+    sources: MOCK_SOURCES,
     topPosts: [
       {rank:1,title:'Spring collection',date:'23 Mar',reach:5812,imp:9240,likes:441,comments:38,saves:87,eng:6.4},
       {rank:2,title:'Quality over noise',date:'26 Mar',reach:3240,imp:5180,likes:312,comments:24,saves:54,eng:5.1},
       {rank:3,title:'Made with intention',date:'18 Mar',reach:3100,imp:4960,likes:289,comments:22,saves:61,eng:4.9},
     ],
+    netFollChange: 270,
   },
+}
+
+function parseApiData(data: StatsData, period: Period): ParsedStats | null {
+  // Require at least some media or insight data to avoid rendering mock values as "live"
+  const hasMedia    = (data.media?.length ?? 0) > 0
+  const hasInsights = (data.insights?.length ?? 0) > 0
+  if (!hasMedia && !hasInsights) return null
+
+  const reachMetric = data.insights?.find(m => m.name === 'reach')
+  const impMetric   = data.insights?.find(m => m.name === 'impressions')
+  const follMetric  = data.insights?.find(m => m.name === 'follower_count')
+
+  const reachVals = reachMetric?.values ?? []
+  const impVals   = impMetric?.values ?? []
+  const follVals  = follMetric?.values ?? []
+
+  const totalReach       = reachVals.reduce((s, v) => s + v.value, 0)
+  const totalImpressions = impVals.reduce((s, v) => s + v.value, 0)
+  const currentFollowers = follVals.length ? follVals[follVals.length - 1].value : 0
+  const netFollChange    = follVals.length > 1 ? follVals[follVals.length - 1].value - follVals[0].value : 0
+
+  // Reach over time (only build from insights if we have values)
+  let reachData: ParsedStats['reachData'] = []
+  if (reachVals.length) {
+    if (period === 7) {
+      reachData = reachVals.slice(-7).map(v => ({
+        date: new Date(v.end_time).toLocaleDateString('en', { weekday: 'short' }),
+        reach: v.value,
+        prev: 0,
+      }))
+    } else if (period === 30) {
+      reachData = reachVals.slice(-30).map(v => {
+        const d = new Date(v.end_time)
+        return { date: `${d.getDate()}/${d.getMonth() + 1}`, reach: v.value, prev: 0 }
+      })
+    } else {
+      const last = reachVals.slice(-84)
+      const weeks: ParsedStats['reachData'] = []
+      for (let i = 0; i < 12; i++) {
+        const chunk = last.slice(i * 7, (i + 1) * 7)
+        if (!chunk.length) continue
+        weeks.push({ date: `W${i + 1}`, reach: chunk.reduce((s, v) => s + v.value, 0), prev: 0 })
+      }
+      reachData = weeks
+    }
+  }
+
+  // Follower growth by week
+  const numWeeks = period === 7 ? 5 : period === 30 ? 4 : 3
+  const weekLabels: Record<number, string[]> = {
+    7: ['W–4','W–3','W–2','W–1','This'],
+    30: ['W1','W2','W3','W4'],
+    90: ['Jan','Feb','Mar'],
+  }
+  const followData: ParsedStats['followData'] = []
+  if (follVals.length > 1) {
+    const bucket = Math.ceil(follVals.length / numWeeks)
+    for (let i = 0; i < numWeeks; i++) {
+      const slice = follVals.slice(i * bucket, (i + 1) * bucket + 1)
+      if (slice.length < 2) continue
+      const net = slice[slice.length - 1].value - slice[0].value
+      followData.push({
+        week: weekLabels[period][i] ?? `W${i + 1}`,
+        new:  Math.max(0, net),
+        lost: Math.min(0, net),
+      })
+    }
+  }
+
+  // Top posts — sorted by interactions
+  const media = data.media ?? []
+  const sorted = [...media].sort(
+    (a, b) => ((b.like_count ?? 0) + (b.comments_count ?? 0)) - ((a.like_count ?? 0) + (a.comments_count ?? 0))
+  )
+  const topPosts: ParsedStats['topPosts'] = sorted.slice(0, 5).map((post, i) => {
+    const interactions = (post.like_count ?? 0) + (post.comments_count ?? 0)
+    const denom = post.reach || currentFollowers || 1
+    const eng = parseFloat(((interactions / denom) * 100).toFixed(1))
+    const dt = new Date(post.timestamp)
+    const dateStr = `${dt.getDate()} ${dt.toLocaleString('en', { month: 'short' })}`
+    const cap = post.caption || '(no caption)'
+    return {
+      rank: i + 1,
+      title: cap.length > 40 ? cap.slice(0, 40) + '…' : cap,
+      date: dateStr,
+      reach: post.reach ?? 0,
+      imp: post.impressions ?? 0,
+      likes: post.like_count ?? 0,
+      comments: post.comments_count ?? 0,
+      saves: post.saves ?? 0,
+      eng,
+    }
+  })
+
+  // Engagement by post (chronological order for chart)
+  const engData: ParsedStats['engData'] = media.slice(0, 10).map((post, i) => {
+    const interactions = (post.like_count ?? 0) + (post.comments_count ?? 0)
+    const denom = post.reach || currentFollowers || 1
+    return { post: `P${i + 1}`, rate: parseFloat(((interactions / denom) * 100).toFixed(1)) }
+  })
+
+  const avgEng = engData.length
+    ? (engData.reduce((s, e) => s + e.rate, 0) / engData.length).toFixed(1) + '%'
+    : '—'
+
+  // If insights gave us nothing but media has per-post reach, sum those as proxy totals
+  const mediaReachTotal = totalReach || (data.media ?? []).reduce((s, p) => s + (p.reach ?? 0), 0)
+  const mediaImpTotal   = totalImpressions || (data.media ?? []).reduce((s, p) => s + (p.impressions ?? 0), 0)
+
+  return {
+    kpi: {
+      followers: currentFollowers ? fmt(currentFollowers) : '—',
+      reach: mediaReachTotal ? fmt(mediaReachTotal) : '—',
+      impressions: mediaImpTotal ? fmt(mediaImpTotal) : '—',
+      eng: avgEng,
+    },
+    reachData: reachData.length ? reachData : MOCK[period].reachData,
+    followData: followData.length ? followData : MOCK[period].followData,
+    engData: engData.length ? engData : MOCK[period].engData,
+    sources: MOCK_SOURCES,
+    topPosts: topPosts.length ? topPosts : MOCK[period].topPosts,
+    netFollChange,
+  }
 }
 
 const HEATMAP_DATA = [
@@ -84,56 +236,170 @@ const HEATMAP_HOURS = ['6am','9am','12pm','3pm','6pm','9pm']
 const HEATMAP_IDXS  = [0,1,3,5,7,9,11]
 
 export default function StatisticsPage() {
-  const [period, setPeriod] = useState<Period>(30)
-  const [apiData, setApiData] = useState<StatsData | null>(null)
+  const [period, setPeriod]     = useState<Period>(30)
+  const [apiData, setApiData]   = useState<StatsData | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [isLive, setIsLive]     = useState(false)
 
   useEffect(() => {
-    fetch('/api/instagram/stats').then(r => r.json()).then(setApiData).catch(() => {})
-  }, [])
+    setLoading(true)
+    fetch(`/api/instagram/stats?period=${period}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.error && (data.insights?.length || data.media?.length)) {
+          setApiData(data)
+          setIsLive(true)
+        }
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [period])
 
-  const d   = MOCK[period]
-  const kpi = d.kpi
+  const parsedData = apiData ? parseApiData(apiData, period) : null
+  const d          = parsedData ?? MOCK[period]
+  const kpi        = d.kpi
+
   const engColors = d.engData.map(v => v.rate >= 5 ? CANDLE : v.rate >= 4 ? 'rgba(212,168,75,.65)' : 'rgba(212,168,75,.38)')
 
+  const follTrend = parsedData
+    ? (d.netFollChange >= 0 ? `+${fmt(d.netFollChange)} this period` : `${fmt(d.netFollChange)} this period`)
+    : '+118 this period'
+
   const kpiItems = [
-    { label:'Total followers',   val:kpi.followers,   trend:'+118 this period', spark:'M0,28 L13,22 L26,24 L40,14 L53,17 L66,8 L80,5' },
-    { label:'Total reach',       val:kpi.reach,       trend:'+22% vs prev.',   spark:'M0,26 L13,20 L26,22 L40,12 L53,15 L66,6 L80,3' },
-    { label:'Impressions',       val:kpi.impressions, trend:'+18% vs prev.',   spark:'M0,24 L13,18 L26,20 L40,10 L53,13 L66,5 L80,2' },
-    { label:'Avg. engagement',   val:kpi.eng,         trend:'+0.6pp',          spark:'M0,22 L13,19 L26,21 L40,14 L53,16 L66,10 L80,7' },
+    { label:'Total followers',   val:kpi.followers,   trend: follTrend,           spark:'M0,28 L13,22 L26,24 L40,14 L53,17 L66,8 L80,5' },
+    { label:'Total reach',       val:kpi.reach,       trend:'+22% vs prev.',      spark:'M0,26 L13,20 L26,22 L40,12 L53,15 L66,6 L80,3' },
+    { label:'Impressions',       val:kpi.impressions, trend:'+18% vs prev.',      spark:'M0,24 L13,18 L26,20 L40,10 L53,13 L66,5 L80,2' },
+    { label:'Avg. engagement',   val:kpi.eng,         trend:'+0.6pp',             spark:'M0,22 L13,19 L26,21 L40,14 L53,16 L66,10 L80,7' },
   ]
 
-  const insights = [
-    {
-      icon: (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke={CANDLE} strokeWidth="1.4"/>
-          <path d="M12 7v5l3 2" stroke={CANDLE} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+  const hl = { color: '#F6F2EA', fontStyle: 'normal' as const, fontWeight: 400 }
+
+  const iconClock = (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke={CANDLE} strokeWidth="1.4"/>
+      <path d="M12 7v5l3 2" stroke={CANDLE} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+  const iconTrend = (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <polyline points="3,17 8,9 13,13 17,6 21,10" stroke={CANDLE} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+  const iconTarget = (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke={CANDLE} strokeWidth="1.4"/>
+      <circle cx="12" cy="12" r="3.5" stroke={CANDLE} strokeWidth="1.4"/>
+      <path d="M12 3v2M12 19v2M21 12h-2M5 12H3" stroke={CANDLE} strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  )
+
+  let insights: Array<{ icon: React.ReactNode; label: string; text: React.ReactNode }>
+
+  if (parsedData && apiData?.media?.length) {
+    const media = apiData.media
+
+    // Insight 1: top performing post
+    const best = parsedData.topPosts[0]
+    const ins1 = best && best.reach > 0 ? {
+      icon: iconClock,
+      label: 'Best performer',
+      text: (
+        <span>
+          &ldquo;{best.title}&rdquo; reached <strong style={hl}>{fmt(best.reach)}</strong> accounts
+          with a <strong style={hl}>{best.eng}%</strong> engagement rate — your top post this period.
+        </span>
       ),
-      label: 'Best posting time',
-      text: <span>Posts published <strong style={{color:'#F6F2EA',fontStyle:'normal',fontWeight:400}}>Tue &amp; Thu 18:00–20:00</strong> generate 2.3× more engagement than your average.</span>,
-    },
-    {
-      icon: (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-          <polyline points="3,17 8,9 13,13 17,6 21,10" stroke={CANDLE} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+    } : {
+      icon: iconClock,
+      label: 'Top post',
+      text: (
+        <span>
+          Your top post this period was <strong style={hl}>&ldquo;{best?.title ?? '—'}&rdquo;</strong> with{' '}
+          <strong style={hl}>{best?.likes ?? 0} likes</strong> and{' '}
+          <strong style={hl}>{best?.comments ?? 0} comments</strong>.
+        </span>
       ),
-      label: 'Top content type',
-      text: <span><strong style={{color:'#F6F2EA',fontStyle:'normal',fontWeight:400}}>Brand story posts</strong> outperform product posts by 41% on reach. Lumen has weighted this month&apos;s schedule accordingly.</span>,
-    },
-    {
-      icon: (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke={CANDLE} strokeWidth="1.4"/>
-          <circle cx="12" cy="12" r="3.5" stroke={CANDLE} strokeWidth="1.4"/>
-          <path d="M12 3v2M12 19v2M21 12h-2M5 12H3" stroke={CANDLE} strokeWidth="1.4" strokeLinecap="round"/>
-        </svg>
+    }
+
+    // Insight 2: best posting day computed from timestamps + engagement
+    const dayMap: Record<string, { total: number; count: number }> = {}
+    for (const post of media) {
+      if (!post.timestamp) continue
+      const day = new Date(post.timestamp).toLocaleDateString('en', { weekday: 'long' })
+      const interactions = (post.like_count ?? 0) + (post.comments_count ?? 0)
+      const rate = interactions / Math.max(post.reach ?? 0, 1)
+      if (!dayMap[day]) dayMap[day] = { total: 0, count: 0 }
+      dayMap[day].total += rate
+      dayMap[day].count += 1
+    }
+    const dayRanked = Object.entries(dayMap)
+      .map(([day, v]) => ({ day, avg: v.count > 0 ? v.total / v.count : 0 }))
+      .sort((a, b) => b.avg - a.avg)
+    const overallAvg = dayRanked.reduce((s, d) => s + d.avg, 0) / Math.max(dayRanked.length, 1)
+    const ins2 = dayRanked.length >= 2 ? {
+      icon: iconTrend,
+      label: 'Best posting day',
+      text: (
+        <span>
+          Posts on <strong style={hl}>{dayRanked[0].day}</strong> average{' '}
+          <strong style={hl}>{Math.round((dayRanked[0].avg / Math.max(overallAvg, 0.001) - 1) * 100)}%</strong>{' '}
+          more engagement than your other days. Schedule more content then.
+        </span>
       ),
-      label: 'Growth forecast',
-      text: <span>At current trajectory, you&apos;ll reach <strong style={{color:'#F6F2EA',fontStyle:'normal',fontWeight:400}}>3,200 followers</strong> by end of April — 12 days ahead of last month&apos;s forecast.</span>,
-    },
-  ]
+    } : {
+      icon: iconTrend,
+      label: 'Content performance',
+      text: (
+        <span>
+          You published <strong style={hl}>{media.length} posts</strong> this {period}-day period
+          with an average engagement rate of <strong style={hl}>{parsedData.kpi.eng}</strong>.
+        </span>
+      ),
+    }
+
+    // Insight 3: follower growth with simple projection
+    const net = parsedData.netFollChange
+    const follRaw = parseInt(parsedData.kpi.followers.replace(/[^0-9]/g, '')) || 0
+    const monthlyRate = period > 0 ? Math.round((net / period) * 30) : 0
+    const ins3 = {
+      icon: iconTarget,
+      label: 'Follower growth',
+      text: net !== 0 ? (
+        <span>
+          Your account <strong style={hl}>{net >= 0 ? `gained ${net}` : `lost ${Math.abs(net)}`} followers</strong> this{' '}
+          {period}-day period.{' '}
+          {monthlyRate > 0
+            ? <>At this pace you&apos;ll add <strong style={hl}>~{monthlyRate} followers</strong> per month, reaching <strong style={hl}>{fmt(follRaw + monthlyRate)}</strong> within 30 days.</>
+            : <>Focus on consistent posting to accelerate growth.</>}
+        </span>
+      ) : (
+        <span>
+          Follower count held steady at <strong style={hl}>{parsedData.kpi.followers}</strong> this period.
+          Consistent, engaging posts are key to driving new follows.
+        </span>
+      ),
+    }
+
+    insights = [ins1, ins2, ins3]
+  } else {
+    insights = [
+      {
+        icon: iconClock,
+        label: 'Best posting time',
+        text: <span>Posts published <strong style={hl}>Tue &amp; Thu 18:00–20:00</strong> generate 2.3× more engagement than your average.</span>,
+      },
+      {
+        icon: iconTrend,
+        label: 'Top content type',
+        text: <span><strong style={hl}>Brand story posts</strong> outperform product posts by 41% on reach. Lumen has weighted this month&apos;s schedule accordingly.</span>,
+      },
+      {
+        icon: iconTarget,
+        label: 'Growth forecast',
+        text: <span>At current trajectory, you&apos;ll reach <strong style={hl}>3,200 followers</strong> by end of April — 12 days ahead of last month&apos;s forecast.</span>,
+      },
+    ]
+  }
 
   return (
     <>
@@ -186,6 +452,12 @@ export default function StatisticsPage() {
         <div>
           <span style={{ fontSize:10, letterSpacing:'0.14em', textTransform:'uppercase', color:'var(--candle)', fontWeight:600 }}>Performance Portfolio</span>
           <h1 style={{ fontFamily:'var(--font-syne)', fontSize:32, fontWeight:800, letterSpacing:'-.03em', color:'var(--parchment)', lineHeight:1.1, marginTop:4 }}>Statistics</h1>
+          {isLive && !loading && (
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:6 }}>
+              <div style={{ width:6, height:6, borderRadius:'50%', background:'#6EBF8B' }}/>
+              <span style={{ fontSize:10, color:'rgba(110,191,139,.8)', fontFamily:'var(--font-ibm)' }}>Live Instagram data</span>
+            </div>
+          )}
         </div>
         <div className="st-topbar-right" style={{ display:'flex', gap:10, alignItems:'center' }}>
           <div className="st-period-btns" style={{ display:'flex', background:'var(--surface-2)', border:'1px solid rgba(78,69,56,0.25)', borderRadius:9999, padding:'4px', gap:2 }}>
@@ -205,7 +477,7 @@ export default function StatisticsPage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="st-content" style={{ flex:1, overflowY:'auto', padding:'28px 32px 52px' }}>
+      <div className="st-content" style={{ flex:1, overflowY:'auto', padding:'28px 32px 52px', opacity: loading ? 0.5 : 1, transition:'opacity .2s' }}>
 
         {/* KPI bento grid */}
         <div className="st-r1 st-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
@@ -256,7 +528,7 @@ export default function StatisticsPage() {
               </div>
               <div style={{ textAlign:'right' }}>
                 <div style={{ fontFamily:'var(--font-syne)', fontSize:26, fontWeight:800, color:'var(--candle)', letterSpacing:'-.03em' }}>{kpi.reach}</div>
-                <div style={{ fontSize:11, color:'#6EBF8B', marginTop:2 }}>↑ 22% vs prev.</div>
+                <div style={{ fontSize:11, color:'#6EBF8B', marginTop:2 }}>this period</div>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={200}>
@@ -270,7 +542,9 @@ export default function StatisticsPage() {
                 <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} interval={period===30?4:period===90?2:0}/>
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} tickFormatter={fmt} width={36}/>
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color:'#F6F2EA' }} labelStyle={{ color:'rgba(246,242,234,.6)', fontSize:10 }}/>
-                <Area type="monotone" dataKey="prev"  stroke="rgba(212,168,75,.28)" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} name="Prev. period"/>
+                {!parsedData && (
+                  <Area type="monotone" dataKey="prev" stroke="rgba(212,168,75,.28)" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} name="Prev. period"/>
+                )}
                 <Area type="monotone" dataKey="reach" stroke={CANDLE} strokeWidth={2} fill="url(#reachGrad)" dot={false} activeDot={{ r:5, fill:CANDLE, stroke:'#111009', strokeWidth:2 }} name="Reach"/>
               </AreaChart>
             </ResponsiveContainer>
@@ -278,9 +552,11 @@ export default function StatisticsPage() {
               <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:10, color:'rgba(246,242,234,.32)', fontFamily:'var(--font-ibm)' }}>
                 <div style={{ width:16, height:2, borderRadius:1, background:CANDLE }}/> Reach
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:10, color:'rgba(246,242,234,.32)', fontFamily:'var(--font-ibm)' }}>
-                <div style={{ width:16, height:1, borderTop:'1px dashed rgba(212,168,75,.4)' }}/> Prev. period
-              </div>
+              {!parsedData && (
+                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:10, color:'rgba(246,242,234,.32)', fontFamily:'var(--font-ibm)' }}>
+                  <div style={{ width:16, height:1, borderTop:'1px dashed rgba(212,168,75,.4)' }}/> Prev. period
+                </div>
+              )}
             </div>
           </div>
 
@@ -292,7 +568,9 @@ export default function StatisticsPage() {
                 <div style={{ fontSize:12, color:'var(--muted)', marginTop:4 }}>Net new followers per week</div>
               </div>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontFamily:'var(--font-syne)', fontSize:24, fontWeight:700, color:CANDLE, letterSpacing:'-.03em' }}>+118</div>
+                <div style={{ fontFamily:'var(--font-syne)', fontSize:24, fontWeight:700, color:CANDLE, letterSpacing:'-.03em' }}>
+                  {parsedData ? (d.netFollChange >= 0 ? `+${fmt(d.netFollChange)}` : fmt(d.netFollChange)) : '+118'}
+                </div>
                 <div style={{ fontSize:10, color:'rgba(110,191,139,.8)', marginTop:2, fontFamily:'var(--font-ibm)' }}>↑ this period</div>
               </div>
             </div>
@@ -424,8 +702,9 @@ export default function StatisticsPage() {
             </thead>
             <tbody>
               {d.topPosts.map(p => {
-                const rankColor = p.rank===1 ? 'var(--candle)' : p.rank===2 ? 'var(--sand)' : p.rank===3 ? 'var(--muted)' : 'var(--muted)'
-                const barW = (p.eng / 6.4 * 100).toFixed(0)
+                const maxEng = Math.max(...d.topPosts.map(x => x.eng), 0.1)
+                const barW = (p.eng / maxEng * 100).toFixed(0)
+                const rankColor = p.rank===1 ? 'var(--candle)' : p.rank===2 ? 'var(--sand)' : 'var(--muted)'
                 return (
                   <tr key={p.rank} className="st-tr" style={{ borderBottom:'1px solid rgba(78,69,56,0.15)' }}>
                     <td style={{ paddingLeft:20 }}>

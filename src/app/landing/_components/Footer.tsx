@@ -3,6 +3,11 @@ import { Button, LumenWordmark } from './ui'
 import { useT } from './LangContext'
 import { useBreakpoint } from './useBreakpoint'
 
+const LINK_HREFS: Record<string, string> = {
+  'Privacy': '/landing/privacy',
+  'Terms': '/landing/terms',
+}
+
 export function Footer({ onCTA }: { onCTA: () => void }) {
   const { t } = useT()
   const { isMobile, isTablet } = useBreakpoint()
@@ -87,7 +92,7 @@ export function Footer({ onCTA }: { onCTA: () => void }) {
                   <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {c.links.map(l => (
                       <li key={l}>
-                        <a href="#" style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, textDecoration: 'none', transition: 'color .15s' }}
+                        <a href={LINK_HREFS[l] ?? '#'} style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, textDecoration: 'none', transition: 'color .15s' }}
                           onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
                           onMouseLeave={e => (e.currentTarget.style.color = 'var(--sand)')}
                         >{l}</a>

@@ -1,81 +1,107 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Lumen',
-  description: 'How Lumen collects, uses, and protects your data.',
+  title: 'Terms of Service — Lumen',
+  description: 'Terms and conditions for using the Lumen platform.',
 }
 
 const sections = [
   {
     number: '01',
-    title: 'Information We Collect',
+    title: 'Acceptance of Terms',
     body: [
-      'When you connect your Instagram account, we collect your Instagram username and a long-lived access token issued by Meta. This token allows Lumen to publish content on your behalf.',
-      'We also store the brand settings you provide during onboarding — including your brand name, industry, tone of voice, target audience, and any uploaded brand assets such as logos and photos.',
-      'Your email address is collected at account registration and used solely for authentication and service communications.',
+      'By creating an account or using Lumen, you agree to be bound by these Terms of Service. If you do not agree, do not use the service.',
+      'We may update these terms from time to time. Continued use of Lumen after changes are posted constitutes acceptance of the revised terms.',
     ],
   },
   {
     number: '02',
-    title: 'How We Use Your Data',
+    title: 'Description of Service',
     body: [
-      'Your Instagram access token is used exclusively to create and publish posts to your Instagram account through the Meta Graph API. We do not read your direct messages, follower list, or any other account data beyond what is necessary to publish content.',
-      'Your brand settings are passed to AI models (OpenAI, Anthropic, Google Gemini) solely to generate captions, image prompts, and visual content tailored to your brand. We do not use your data to train third-party models.',
-      'Aggregated, anonymised usage data may be used to improve Lumen\'s generation quality and reliability.',
+      'Lumen is an AI-powered brand publishing platform that generates and publishes content to your Instagram account on your behalf. The service includes brand configuration, AI content generation (captions, images), post scheduling, and analytics.',
+      'Lumen is provided as a Software-as-a-Service (SaaS) and requires a valid subscription to access core features.',
     ],
   },
   {
     number: '03',
-    title: 'Data Storage',
+    title: 'Account Responsibilities',
     body: [
-      'All user data is stored in a PostgreSQL database hosted by Supabase. Media assets and generated images are stored in Supabase Storage.',
-      'Data is encrypted at rest and in transit. Access is governed by Row-Level Security policies — no user can access another user\'s data.',
-      'Our Supabase project is hosted in the EU (West Europe region). If you are located outside the EU, your data may be transferred internationally when processed by third-party AI services.',
+      'You are responsible for maintaining the confidentiality of your account credentials and for all activity that occurs under your account.',
+      'You must provide accurate information during registration and keep your account details up to date.',
+      'You agree not to share your account with others or use the service in any way that violates applicable laws or these terms.',
     ],
   },
   {
     number: '04',
-    title: 'Third-Party Services',
+    title: 'Instagram & Meta Platform',
     body: [
-      'Lumen integrates with the following third-party services to deliver its core functionality:',
-    ],
-    list: [
-      'Meta / Instagram Graph API — for OAuth authentication and post publishing',
-      'Anthropic — for generating image prompts and template text',
-      'Google Gemini — for AI image generation',
-      'Supabase — for database, authentication, and file storage',
-      'Vercel — for application hosting and serverless execution',
+      'By connecting your Instagram account, you authorise Lumen to publish content, access insights, and manage your connected account through the Meta Graph API.',
+      'Your use of Instagram through Lumen is also subject to Meta\'s Terms of Service and Community Standards. Lumen is not responsible for actions taken by Meta regarding your account.',
+      'You can revoke Lumen\'s access to your Instagram account at any time through Meta\'s connected apps settings.',
     ],
   },
   {
     number: '05',
-    title: 'Data Retention',
+    title: 'Content & Intellectual Property',
     body: [
-      'Your data is retained for as long as your account is active. Generated posts and brand assets are stored indefinitely to power your content history and generation improvements.',
-      'Upon account deletion, all personally identifiable data — including your access token, brand settings, and generated posts — is permanently deleted within 30 days.',
-      'You may request deletion of your Instagram access token at any time without deleting your account. This will disconnect Instagram publishing until you reconnect.',
+      'You retain ownership of all brand assets, logos, and photos you upload to Lumen. By uploading them, you grant Lumen a limited licence to use them solely to generate and publish content on your behalf.',
+      'AI-generated content (captions, images, copy) produced by Lumen using your brand settings is provided to you for your use. You are solely responsible for reviewing and approving content before it is published.',
+      'Lumen retains all rights to its platform, software, design, and proprietary systems.',
     ],
   },
   {
     number: '06',
-    title: 'Your Rights',
+    title: 'Prohibited Uses',
     body: [
-      'You have the right to access, correct, or delete any personal data we hold about you. You may also request a copy of your data in a portable format.',
-      'To exercise any of these rights, email us at lumenhq.contact@gmail.com. We will respond within 30 days.',
-      'You can revoke Lumen\'s access to your Instagram account at any time through Meta\'s app permission settings at facebook.com/settings/connected-apps.',
+      'You agree not to use Lumen to generate or publish content that is unlawful, hateful, deceptive, or violates any third-party rights.',
+      'You may not attempt to reverse-engineer, scrape, or exploit the Lumen platform or its APIs beyond normal authorised use.',
+      'Abuse of the platform — including generating spam, operating multiple accounts to circumvent limits, or attempting to bypass rate limits — may result in account suspension.',
     ],
   },
   {
     number: '07',
+    title: 'Subscription & Billing',
+    body: [
+      'Access to Lumen requires a paid subscription. Subscription fees are billed in advance and are non-refundable except as required by applicable law.',
+      'You may cancel your subscription at any time. Cancellation takes effect at the end of your current billing period.',
+      'We reserve the right to change pricing with at least 30 days\' written notice to existing subscribers.',
+    ],
+  },
+  {
+    number: '08',
+    title: 'Disclaimer of Warranties',
+    body: [
+      'Lumen is provided "as is" and "as available" without warranties of any kind, express or implied. We do not warrant that the service will be uninterrupted, error-free, or that AI-generated content will meet your expectations.',
+      'AI-generated content may occasionally contain inaccuracies. You are solely responsible for reviewing all content before it is published to your audience.',
+    ],
+  },
+  {
+    number: '09',
+    title: 'Limitation of Liability',
+    body: [
+      'To the maximum extent permitted by law, Lumen and its operators shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service.',
+      'Our total liability to you for any claim shall not exceed the amount you paid to us in the 12 months preceding the claim.',
+    ],
+  },
+  {
+    number: '10',
+    title: 'Termination',
+    body: [
+      'We may suspend or terminate your account if you breach these terms, engage in prohibited conduct, or for any other reason with reasonable notice.',
+      'Upon termination, your access to the service will cease. Data deletion follows the schedule described in our Privacy Policy.',
+    ],
+  },
+  {
+    number: '11',
     title: 'Contact',
     body: [
-      'If you have any questions or concerns about this Privacy Policy or how your data is handled, please contact us at:',
+      'For any questions about these Terms of Service, please contact us at:',
     ],
     contact: 'lumenhq.contact@gmail.com',
   },
 ]
 
-export default function PrivacyPage() {
+export default function TermsPage() {
   return (
     <div style={{ background: 'var(--carbon)', minHeight: '100vh', color: 'var(--parchment)' }}>
 
@@ -98,9 +124,7 @@ export default function PrivacyPage() {
           fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)',
           textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6,
           transition: 'color .15s',
-        }}
-          onMouseEnter={undefined}
-        >
+        }}>
           <span style={{ fontSize: 16, verticalAlign: 'middle' }}>←</span>
           Back to home
         </a>
@@ -127,21 +151,21 @@ export default function PrivacyPage() {
           fontSize: 'clamp(36px, 6vw, 56px)',
           lineHeight: 1.05, letterSpacing: '-0.03em',
           color: 'var(--parchment)',
-        }}>Privacy Policy</h1>
+        }}>Terms of Service</h1>
 
         <p style={{
           margin: 0, fontFamily: 'var(--font-ibm)', fontWeight: 300,
           fontSize: 15, color: 'var(--sand)', lineHeight: 1.6,
         }}>
-          Last updated: <span style={{ color: 'var(--parchment)' }}>April 20, 2026</span>
+          Last updated: <span style={{ color: 'var(--parchment)' }}>April 21, 2026</span>
         </p>
 
         <p style={{
           margin: '20px 0 0', fontFamily: 'var(--font-ibm)', fontWeight: 300,
           fontSize: 15, color: 'var(--sand)', lineHeight: 1.7, maxWidth: 600,
         }}>
-          Lumen is committed to protecting your privacy. This policy explains what data we collect,
-          why we collect it, and how we handle it.
+          These Terms of Service govern your access to and use of the Lumen platform.
+          Please read them carefully before using the service.
         </p>
       </header>
 
@@ -175,24 +199,6 @@ export default function PrivacyPage() {
                     fontSize: 15, lineHeight: 1.75, color: 'var(--sand)',
                   }}>{para}</p>
                 ))}
-
-                {section.list && (
-                  <ul style={{ margin: '16px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {section.list.map((item, j) => (
-                      <li key={j} style={{
-                        display: 'flex', gap: 12, alignItems: 'flex-start',
-                        fontFamily: 'var(--font-ibm)', fontWeight: 300,
-                        fontSize: 15, color: 'var(--sand)', lineHeight: 1.6,
-                      }}>
-                        <span style={{
-                          width: 4, height: 4, borderRadius: '50%',
-                          background: 'var(--candle)', marginTop: 9, flexShrink: 0,
-                        }}/>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                )}
 
                 {section.contact && (
                   <a href={`mailto:${section.contact}`} style={{
