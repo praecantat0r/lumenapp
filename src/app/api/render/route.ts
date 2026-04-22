@@ -45,9 +45,8 @@ async function renderHTMLToPNG(html: string, width: number, height: number): Pro
     const puppeteerCore = (await import('puppeteer-core')).default
     browser = await puppeteerCore.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless as boolean,
+      headless: true,
     })
   } else {
     const puppeteer = (await import('puppeteer')).default
