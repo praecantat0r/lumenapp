@@ -504,6 +504,45 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     }
   }, [])
 
+  // ── Tap outside the post → deselect (mobile) ────────────────────────────────
+  useEffect(() => {
+    const container = canvasAreaRef.current
+    if (!container) return
+
+    let startX = 0, startY = 0
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length !== 1) return
+      const t = e.changedTouches[0]
+      if (Math.hypot(t.clientX - startX, t.clientY - startY) > 10) return // drag, not tap
+
+      const outer = canvasOuterRef.current
+      const fc    = fabricRef.current
+      if (!outer || !fc || !fc.getActiveObject()) return
+
+      const rect   = outer.getBoundingClientRect()
+      const onPost = t.clientX >= rect.left && t.clientX <= rect.right &&
+                     t.clientY >= rect.top  && t.clientY <= rect.bottom
+      if (!onPost) {
+        fc.discardActiveObject()
+        fc.renderAll()
+      }
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, [])
+
   // ── Sync UI state when selected object changes ────────────────────────────────
   useEffect(() => {
     if (!selectedObj) return
@@ -1113,15 +1152,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       canvas.on('selection:updated', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
       canvas.on('selection:cleared', () => setSelectedObj(null))
 
-      // On touch devices, selection:false prevents Fabric from auto-deselecting on empty tap — do it manually
-      if (isTouchDevice) {
-        canvas.on('mouse:down', (e: any) => {
-          if (!e.target) {
-            canvas.discardActiveObject()
-            canvas.renderAll()
-          }
-        })
-      }
       canvas.on('object:added',    () => { refreshLayers(); pushUndo() })
       canvas.on('object:removed',  () => { refreshLayers(); pushUndo() })
       canvas.on('object:modified', (e: any) => {
