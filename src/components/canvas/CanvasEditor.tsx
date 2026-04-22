@@ -423,6 +423,87 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     }
   }, [])
 
+  // ── Pinch-to-zoom canvas (mobile, fires when no object is selected) ──────────
+  useEffect(() => {
+    const container = canvasAreaRef.current
+    if (!container) return
+
+    let isZooming    = false
+    let zoomInitDist = 0
+    let zoomInitScale = 1
+    let latestRatio  = 1
+    let latestMidX   = 0
+    let latestMidY   = 0
+    let rafId: number | null = null
+
+    function dist(touches: TouchList) {
+      const dx = touches[0].clientX - touches[1].clientX
+      const dy = touches[0].clientY - touches[1].clientY
+      return Math.hypot(dx, dy)
+    }
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return
+      const obj = fabricRef.current?.getActiveObject()
+      if (obj) return  // object selected → existing pinch-resize handler owns this gesture
+      isZooming     = true
+      zoomInitDist  = dist(e.touches)
+      zoomInitScale = canvasScaleRef.current
+      latestRatio   = 1
+      e.preventDefault()
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isZooming || e.touches.length !== 2) return
+      e.preventDefault()
+      latestRatio = dist(e.touches) / zoomInitDist
+      latestMidX  = (e.touches[0].clientX + e.touches[1].clientX) / 2
+      latestMidY  = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const outer = canvasOuterRef.current
+        const inner = canvasInnerRef.current
+        if (!outer || !inner) return
+        const oldScale = canvasScaleRef.current
+        const newScale = Math.max(0.1, Math.min(2, zoomInitScale * latestRatio))
+        if (newScale === oldScale) return
+        const oRect = outer.getBoundingClientRect()
+        const fx = (latestMidX - oRect.left) / oldScale
+        const fy = (latestMidY - oRect.top)  / oldScale
+        outer.style.width     = `${DISPLAY_WIDTH  * newScale}px`
+        outer.style.height    = `${DISPLAY_HEIGHT * newScale}px`
+        inner.style.transform = `scale(${newScale})`
+        const newRect = outer.getBoundingClientRect()
+        container.scrollLeft += (newRect.left + fx * newScale) - latestMidX
+        container.scrollTop  += (newRect.top  + fy * newScale) - latestMidY
+        canvasScaleRef.current = newScale
+        setCanvasScale(newScale)
+        manualZoom.current = true
+      })
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isZooming) return
+      if (e.touches.length < 2) {
+        isZooming = false
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      }
+    }
+
+    container.addEventListener('touchstart',  onTouchStart, { passive: false })
+    container.addEventListener('touchmove',   onTouchMove,  { passive: false })
+    container.addEventListener('touchend',    onTouchEnd)
+    container.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      container.removeEventListener('touchstart',  onTouchStart)
+      container.removeEventListener('touchmove',   onTouchMove)
+      container.removeEventListener('touchend',    onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [])
+
   // ── Sync UI state when selected object changes ────────────────────────────────
   useEffect(() => {
     if (!selectedObj) return
@@ -1753,8 +1834,10 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--carbon)', overflow: 'hidden', fontFamily: 'var(--font-ibm)' }}>
       <style>{`
         .ce-mobile-hint { display: none; }
+        .ce-left-toggle { left: 0; transition: left 0.38s cubic-bezier(0.4,0,0.2,1), color 0.15s; }
         @media (max-width: 767px) {
           .ce-left-aside  { position: absolute !important; top: 0 !important; left: 0 !important; height: 100% !important; z-index: 50 !important; }
+          .ce-left-toggle.open { left: 220px; }
           .ce-mobile-hint { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; background: rgba(182,141,64,0.08); border-bottom: 1px solid rgba(182,141,64,0.15); font-family: var(--font-ibm); font-size: 11px; color: var(--sand); flex-shrink: 0; }
           .ce-topbar-logo { display: none; }
           .ce-topbar-tabs { margin-left: 0 !important; }
@@ -2489,6 +2572,36 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
               </div>
             )}
           </div>
+        {/* ─── LEFT SIDEBAR TOGGLE TAB ─────────────────────────────────────────── */}
+        {!isPreview && (
+          <button
+            className={`ce-left-toggle${leftSidebarOpen ? ' open' : ''}`}
+            onClick={() => setLeftSidebarOpen(v => !v)}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 51,
+              width: 20, height: 44,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderLeft: 'none',
+              borderRadius: '0 6px 6px 0',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--muted)',
+              padding: 0,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--parchment)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
+            title={leftSidebarOpen ? 'Close panel' : 'Open panel'}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+              {leftSidebarOpen ? 'chevron_left' : 'chevron_right'}
+            </span>
+          </button>
+        )}
+
         {/* ─── RIGHT PANEL TOGGLE TAB ───────────────────────────────────────────── */}
         {selectedObj && !isPreview && (
           <button
