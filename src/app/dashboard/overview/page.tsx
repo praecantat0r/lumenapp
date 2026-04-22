@@ -104,9 +104,11 @@ export default async function OverviewPage() {
             padding: 16px 16px !important; align-items: flex-start !important;
           }
           .ov-topbar-actions {
-            width: 100%; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            width: 100%; display: flex; gap: 8px; align-items: center; flex-direction: column;
           }
-          .ov-search-wrap { flex: 1; min-width: 120px; }
+          .ov-search-row { width: 100%; display: flex; gap: 8px; align-items: center; }
+          .ov-search-wrap { flex: 1; min-width: 0; }
+          .ov-ghost-btn { width: 100%; justify-content: center; }
         }
         @media (max-width: 480px) {
           .ov-main { padding: 8px 8px 24px !important; }
@@ -125,11 +127,13 @@ export default async function OverviewPage() {
           <h1 style={{ fontFamily: 'var(--font-syne)', fontSize: 32, fontWeight: 800, letterSpacing: '-.03em', color: 'var(--parchment)', lineHeight: 1.1, marginTop: 4 }}>Overview</h1>
         </div>
         <div className="ov-topbar-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="ov-search-wrap">
-            <OverviewSearch />
+          <div className="ov-search-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="ov-search-wrap">
+              <OverviewSearch />
+            </div>
+            <OverviewGenerateButton />
           </div>
           <a href="/dashboard/posts" className="ov-ghost-btn">View all posts</a>
-          <OverviewGenerateButton />
         </div>
       </div>
 
