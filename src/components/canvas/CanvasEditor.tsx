@@ -988,11 +988,12 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       if (!mounted || !canvasRef.current) return
       if (canvasRef.current.hasAttribute('data-fabric')) return
 
+      const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
       canvas = new Canvas(canvasRef.current, {
         width:  DISPLAY_WIDTH,
         height: DISPLAY_HEIGHT,
         enableRetinaScaling: false,
-        selection: true,
+        selection: !isTouchDevice,
         preserveObjectStacking: true,
       })
       canvas.backgroundColor = resolveCSSVar(templateJson?.background ?? 'var(--carbon)')
