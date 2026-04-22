@@ -1112,6 +1112,16 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       canvas.on('selection:created', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
       canvas.on('selection:updated', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
       canvas.on('selection:cleared', () => setSelectedObj(null))
+
+      // On touch devices, selection:false prevents Fabric from auto-deselecting on empty tap — do it manually
+      if (isTouchDevice) {
+        canvas.on('mouse:down', (e: any) => {
+          if (!e.target) {
+            canvas.discardActiveObject()
+            canvas.renderAll()
+          }
+        })
+      }
       canvas.on('object:added',    () => { refreshLayers(); pushUndo() })
       canvas.on('object:removed',  () => { refreshLayers(); pushUndo() })
       canvas.on('object:modified', (e: any) => {
