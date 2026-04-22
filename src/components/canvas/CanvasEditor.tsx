@@ -305,6 +305,92 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     }
   }, [])
 
+  // ── Pinch-to-resize selected element (mobile two-finger gesture) ──────────────
+  useEffect(() => {
+    const container = canvasAreaRef.current
+    if (!container) return
+
+    let isPinching   = false
+    let initialDist  = 0
+    let initScaleX   = 1
+    let initScaleY   = 1
+    let initFontSize = 32
+    let initWidth    = 200
+
+    function pinchDist(touches: TouchList) {
+      const dx = touches[0].clientX - touches[1].clientX
+      const dy = touches[0].clientY - touches[1].clientY
+      return Math.hypot(dx, dy)
+    }
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return
+      const fc  = fabricRef.current
+      const obj = fc?.getActiveObject()
+      if (!obj) return
+
+      isPinching   = true
+      initialDist  = pinchDist(e.touches)
+      initScaleX   = obj.scaleX  ?? 1
+      initScaleY   = obj.scaleY  ?? 1
+      initFontSize = obj.fontSize ?? 32
+      initWidth    = obj.width    ?? 200
+
+      fc.selection = false
+      e.preventDefault()
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isPinching || e.touches.length !== 2) return
+      const fc  = fabricRef.current
+      const obj = fc?.getActiveObject()
+      if (!obj || initialDist === 0) return
+
+      const ratio = pinchDist(e.touches) / initialDist
+
+      if (obj.type === 'textbox') {
+        const newFontSize = Math.max(4, Math.round(initFontSize * ratio))
+        const newWidth    = Math.max(20, initWidth * ratio)
+        obj.set({ fontSize: newFontSize, width: newWidth, scaleX: 1, scaleY: 1 })
+        obj.dirty = true
+        setFontSize(Math.round(newFontSize / SCALE))
+      } else {
+        obj.set({
+          scaleX: Math.max(0.05, initScaleX * ratio),
+          scaleY: Math.max(0.05, initScaleY * ratio),
+        })
+      }
+
+      obj.setCoords()
+      fc.requestRenderAll()
+      e.preventDefault()
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isPinching) return
+      if (e.touches.length < 2) {
+        isPinching = false
+        const fc = fabricRef.current
+        if (fc) {
+          fc.selection = true
+          pushUndo()
+        }
+      }
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: false })
+    container.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    container.addEventListener('touchend',   onTouchEnd)
+    container.addEventListener('touchcancel', onTouchEnd)
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove',  onTouchMove)
+      container.removeEventListener('touchend',   onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [])
+
   // ── Sync UI state when selected object changes ────────────────────────────────
   useEffect(() => {
     if (!selectedObj) return
