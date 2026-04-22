@@ -316,11 +316,35 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     let initScaleY   = 1
     let initFontSize = 32
     let initWidth    = 200
+    let pinnedObj: any = null   // captured at touchstart — avoids getActiveObject() every frame
+    let rafId: number | null = null
+    let latestRatio  = 1
 
     function pinchDist(touches: TouchList) {
       const dx = touches[0].clientX - touches[1].clientX
       const dy = touches[0].clientY - touches[1].clientY
       return Math.hypot(dx, dy)
+    }
+
+    function applyScale(ratio: number) {
+      const fc  = fabricRef.current
+      const obj = pinnedObj
+      if (!obj || !fc) return
+
+      if (obj.type === 'textbox') {
+        const newFontSize = Math.max(4, initFontSize * ratio)   // float — no rounding here
+        const newWidth    = Math.max(20, initWidth * ratio)
+        obj.set({ fontSize: newFontSize, width: newWidth, scaleX: 1, scaleY: 1 })
+        obj.dirty = true
+      } else {
+        obj.set({
+          scaleX: Math.max(0.05, initScaleX * ratio),
+          scaleY: Math.max(0.05, initScaleY * ratio),
+        })
+      }
+
+      obj.setCoords()
+      fc.renderAll()   // synchronous — avoids queuing multiple deferred renders
     }
 
     const onTouchStart = (e: TouchEvent) => {
@@ -335,58 +359,66 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       initScaleY   = obj.scaleY  ?? 1
       initFontSize = obj.fontSize ?? 32
       initWidth    = obj.width    ?? 200
+      pinnedObj    = obj
+      latestRatio  = 1
 
+      // Lock Fabric's own move/scale handling so it doesn't fight our transform
+      obj.lockMovementX = true
+      obj.lockMovementY = true
       fc.selection = false
       e.preventDefault()
     }
 
     const onTouchMove = (e: TouchEvent) => {
       if (!isPinching || e.touches.length !== 2) return
-      const fc  = fabricRef.current
-      const obj = fc?.getActiveObject()
-      if (!obj || initialDist === 0) return
+      e.preventDefault()
 
-      const ratio = pinchDist(e.touches) / initialDist
+      latestRatio = pinchDist(e.touches) / initialDist
 
-      if (obj.type === 'textbox') {
-        const newFontSize = Math.max(4, Math.round(initFontSize * ratio))
-        const newWidth    = Math.max(20, initWidth * ratio)
-        obj.set({ fontSize: newFontSize, width: newWidth, scaleX: 1, scaleY: 1 })
-        obj.dirty = true
-        setFontSize(Math.round(newFontSize / SCALE))
-      } else {
-        obj.set({
-          scaleX: Math.max(0.05, initScaleX * ratio),
-          scaleY: Math.max(0.05, initScaleY * ratio),
+      // One RAF per display frame — prevents stacking renders faster than 60fps
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null
+          applyScale(latestRatio)
         })
       }
-
-      obj.setCoords()
-      fc.requestRenderAll()
-      e.preventDefault()
     }
 
     const onTouchEnd = (e: TouchEvent) => {
       if (!isPinching) return
       if (e.touches.length < 2) {
         isPinching = false
-        const fc = fabricRef.current
+
+        // Cancel any pending frame and apply the final ratio immediately
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+        applyScale(latestRatio)
+
+        const obj = pinnedObj
+        const fc  = fabricRef.current
+        if (obj) {
+          obj.lockMovementX = false
+          obj.lockMovementY = false
+        }
         if (fc) {
           fc.selection = true
-          pushUndo()
+          // Sync React panel state once after the gesture settles
+          if (obj?.type === 'textbox') setFontSize(Math.round((obj.fontSize ?? 32) / SCALE))
         }
+        pinnedObj = null
+        pushUndo()
       }
     }
 
-    container.addEventListener('touchstart', onTouchStart, { passive: false })
-    container.addEventListener('touchmove',  onTouchMove,  { passive: false })
-    container.addEventListener('touchend',   onTouchEnd)
+    container.addEventListener('touchstart',  onTouchStart, { passive: false })
+    container.addEventListener('touchmove',   onTouchMove,  { passive: false })
+    container.addEventListener('touchend',    onTouchEnd)
     container.addEventListener('touchcancel', onTouchEnd)
 
     return () => {
-      container.removeEventListener('touchstart', onTouchStart)
-      container.removeEventListener('touchmove',  onTouchMove)
-      container.removeEventListener('touchend',   onTouchEnd)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      container.removeEventListener('touchstart',  onTouchStart)
+      container.removeEventListener('touchmove',   onTouchMove)
+      container.removeEventListener('touchend',    onTouchEnd)
       container.removeEventListener('touchcancel', onTouchEnd)
     }
   }, [])

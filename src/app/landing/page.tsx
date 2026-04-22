@@ -71,6 +71,10 @@ function App() {
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' })
   }
 
+  const goToSignup = () => {
+    window.location.href = 'https://app.lumen-reach.com/signup'
+  }
+
   const Hero = state.heroVariant === 'B' ? HeroB : HeroA
 
   return (
@@ -86,7 +90,7 @@ function App() {
         theme={state.theme}
         headline={state.headline}
         ctaLabel={state.ctaLabel}
-        onCTA={scrollToPricing}
+        onCTA={goToSignup}
       />
 
       {state.sections.howItWorks  && <HowItWorks />}
@@ -99,7 +103,7 @@ function App() {
       {state.sections.pricing     && <Pricing onCTA={scrollToPricing} />}
       {state.sections.faq         && <FAQ />}
 
-      <Footer onCTA={scrollToPricing} />
+      <Footer onCTA={goToSignup} />
 
     </>
   )

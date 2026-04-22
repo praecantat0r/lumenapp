@@ -4,8 +4,10 @@ import { useT } from './LangContext'
 import { useBreakpoint } from './useBreakpoint'
 
 const LINK_HREFS: Record<string, string> = {
-  'Privacy': '/landing/privacy',
-  'Terms': '/landing/terms',
+  'Privacy':    '/landing/privacy',
+  'Terms':      '/landing/terms',
+  'Súkromie':   '/landing/privacy',
+  'Podmienky':  '/landing/terms',
 }
 
 export function Footer({ onCTA }: { onCTA: () => void }) {
