@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { AssetUploader } from './AssetUploader'
 import type { BrandBrain, BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
@@ -20,7 +20,7 @@ const SECTIONS = [
 interface Props {
   brandBrain: BrandBrain | null
   assets: BrandAsset[]
-  igConnection: { username?: string; connected_at: string } | null
+  igConnection: { username?: string } | null
   userId: string
 }
 
@@ -138,15 +138,32 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   )
 }
 
-export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnection, userId }: Props) {
-  const [form, setForm]     = useState<Partial<BrandBrain>>(brandBrain || {})
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved]   = useState(false)
-  const [assets, setAssets] = useState(initialAssets)
+export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnection: initialIgConnection, userId }: Props) {
+  const [form, setForm]         = useState<Partial<BrandBrain>>(brandBrain || {})
+  const [saving, setSaving]     = useState(false)
+  const [saved, setSaved]       = useState(false)
+  const [assets, setAssets]     = useState(initialAssets)
   const [activeSection, setActiveSection] = useState('identity')
+  const [igConnection, setIgConnection]   = useState(initialIgConnection)
+  const [disconnecting, setDisconnecting] = useState(false)
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
 
   const score = completeness(form)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('ig_connected') === '1') {
+      toast.success('Instagram connected')
+      // Scroll the schedule section into view so the @handle is visible
+      setTimeout(() => {
+        sectionRefs.current['schedule']?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        setActiveSection('schedule')
+      }, 300)
+      // Clean up the URL without a re-render
+      const clean = window.location.pathname
+      window.history.replaceState({}, '', clean)
+    }
+  }, [])
 
   function update(fields: Partial<BrandBrain>) {
     setForm(prev => ({ ...prev, ...fields }))
@@ -171,6 +188,19 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
       setTimeout(() => setSaved(false), 2000)
     } else {
       toast.error('Save failed')
+    }
+  }
+
+  async function disconnectInstagram() {
+    if (!confirm('Disconnect Instagram? Auto-publishing will stop.')) return
+    setDisconnecting(true)
+    const res = await fetch('/api/instagram/disconnect', { method: 'POST' })
+    setDisconnecting(false)
+    if (res.ok) {
+      setIgConnection(null)
+      toast.success('Instagram disconnected')
+    } else {
+      toast.error('Disconnect failed')
     }
   }
 
@@ -610,9 +640,30 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
                         Auto-publishing enabled
                       </div>
                     </div>
-                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6EBF8B' }} />
-                      <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6EBF8B', fontFamily: 'var(--font-ibm)' }}>Active</span>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6EBF8B' }} />
+                        <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6EBF8B', fontFamily: 'var(--font-ibm)' }}>Active</span>
+                      </div>
+                      <button
+                        onClick={disconnectInstagram}
+                        disabled={disconnecting}
+                        style={{
+                          padding: '5px 12px', borderRadius: 6,
+                          background: 'transparent',
+                          border: '1px solid rgba(196,185,154,0.18)',
+                          color: 'var(--muted)', fontSize: 11,
+                          fontFamily: 'var(--font-ibm)', fontWeight: 400,
+                          cursor: disconnecting ? 'not-allowed' : 'pointer',
+                          opacity: disconnecting ? 0.5 : 1,
+                          transition: 'border-color 0.15s, color 0.15s',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(220,80,80,0.35)'; (e.target as HTMLButtonElement).style.color = '#e07070' }}
+                        onMouseLeave={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(196,185,154,0.18)'; (e.target as HTMLButtonElement).style.color = 'var(--muted)' }}
+                      >
+                        {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                      </button>
                     </div>
                   </div>
                 ) : (

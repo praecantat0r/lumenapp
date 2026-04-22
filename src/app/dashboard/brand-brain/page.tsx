@@ -21,7 +21,7 @@ export default async function BrandBrainPage() {
 
   const { data: igConn } = await supabase
     .from('instagram_connections')
-    .select('username, connected_at')
+    .select('username')
     .eq('user_id', user.id)
     .single()
 

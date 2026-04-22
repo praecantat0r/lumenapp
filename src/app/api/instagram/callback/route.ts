@@ -43,18 +43,26 @@ export async function GET(req: NextRequest) {
     const llData = await llRes.json()
     const longLivedToken = llData.access_token || tokenData.access_token
 
-    // Get Instagram username
-    const igRes = await fetch(
-      `https://graph.instagram.com/v18.0/${igUserId}?fields=id,username&access_token=${longLivedToken}`
-    )
-    const igData = await igRes.json()
+    // Get Instagram username — try /me first, fall back to /{id}
+    let username: string | undefined
+    for (const url of [
+      `https://graph.instagram.com/v21.0/me?fields=id,username&access_token=${longLivedToken}`,
+      `https://graph.instagram.com/v21.0/${igUserId}?fields=id,username&access_token=${longLivedToken}`,
+    ]) {
+      const r = await fetch(url)
+      const d = await r.json()
+      if (d.username) { username = d.username; break }
+      console.warn('IG profile fetch:', JSON.stringify(d))
+    }
+
+    console.log('IG callback — igUserId:', igUserId, '| username:', username, '| longLivedToken ok:', !!llData.access_token)
 
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
 
     await supabase.from('instagram_connections').upsert({
       user_id: userId,
       instagram_user_id: igUserId,
-      username: igData.username,
+      username,
       access_token: longLivedToken,
       token_expires_at: expiresAt,
     }, { onConflict: 'user_id' })
@@ -65,6 +73,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(successRedirect, process.env.NEXT_PUBLIC_APP_URL!))
   } catch (err) {
     console.error('IG callback error:', err)
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
+    return NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
   }
 }
