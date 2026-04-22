@@ -46,53 +46,32 @@ export function Footer({ onCTA }: { onCTA: () => void }) {
       </section>
 
       {/* Footer links */}
-      <section style={{ padding: isMobile ? '48px 20px 28px' : '64px 32px 32px' }}>
-        <div style={{
-          maxWidth: 1240, margin: '0 auto',
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : '1.5fr repeat(4, 1fr)',
-          gap: isMobile ? 36 : 40,
-        }}>
-          <div>
-            <LumenWordmark size={18} />
-            <p style={{ marginTop: 16, fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, lineHeight: 1.6, maxWidth: 280 }}>
-              {t.footer.about}
-            </p>
-            <div style={{ marginTop: 24 }}>
-              <div style={{
-                fontFamily: 'var(--font-ibm)', fontSize: 10, letterSpacing: '0.15em',
-                textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10, fontWeight: 500,
-              }}>{t.footer.dispatches}</div>
-              <form onSubmit={e => e.preventDefault()} style={{ display: 'flex', gap: 6, maxWidth: 320 }}>
-                <input type="email" placeholder={t.footer.emailPh}
-                  style={{
-                    flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 9999, padding: '9px 16px', fontSize: 13,
-                    color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', outline: 'none',
-                  }}/>
-                <button type="submit" style={{
-                  padding: '9px 16px', borderRadius: 9999, border: 'none',
-                  background: 'var(--candle)', color: '#fff', fontFamily: 'var(--font-syne)',
-                  fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
-                }}>{t.footer.subscribe}</button>
-              </form>
+      <section style={{ padding: isMobile ? '40px 20px 24px' : '64px 32px 32px' }}>
+        {isMobile ? (
+          <div style={{ maxWidth: 1240, margin: '0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <LumenWordmark size={18} />
+              <div style={{ display: 'flex', gap: 16 }}>
+                {['Twitter', 'Instagram'].map(name => (
+                  <a key={name} href="#" style={{ fontFamily: 'var(--font-ibm)', fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
+                  >{name}</a>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* On tablet: wrap link columns 2-per-row via the 1fr 1fr grid */}
-          {isTablet && !isMobile ? (
-            // tablet: show all 4 link groups in a 2-col sub-grid
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px 40px', gridColumn: '2 / -1' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px 32px', marginBottom: 28 }}>
               {t.footer.cols.map(c => (
                 <div key={c.title}>
                   <div style={{
-                    fontFamily: 'var(--font-ibm)', fontSize: 10, letterSpacing: '0.15em',
-                    textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 500, marginBottom: 16,
+                    fontFamily: 'var(--font-ibm)', fontSize: 9, letterSpacing: '0.15em',
+                    textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 500, marginBottom: 10,
                   }}>{c.title}</div>
-                  <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {c.links.map(l => (
                       <li key={l}>
-                        <a href={LINK_HREFS[l] ?? '#'} style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, textDecoration: 'none', transition: 'color .15s' }}
+                        <a href={LINK_HREFS[l] ?? '#'} style={{ fontFamily: 'var(--font-ibm)', fontSize: 12, color: 'var(--sand)', fontWeight: 300, textDecoration: 'none' }}
                           onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
                           onMouseLeave={e => (e.currentTarget.style.color = 'var(--sand)')}
                         >{l}</a>
@@ -102,45 +81,107 @@ export function Footer({ onCTA }: { onCTA: () => void }) {
                 </div>
               ))}
             </div>
-          ) : (
-            t.footer.cols.map(c => (
-              <div key={c.title}>
-                <div style={{
-                  fontFamily: 'var(--font-ibm)', fontSize: 10, letterSpacing: '0.15em',
-                  textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 500, marginBottom: 16,
-                }}>{c.title}</div>
-                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {c.links.map(l => (
-                    <li key={l}>
-                      <a href="#" style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, textDecoration: 'none', transition: 'color .15s' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--sand)')}
-                      >{l}</a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))
-          )}
-        </div>
 
-        <div style={{
-          maxWidth: 1240, margin: '40px auto 0', paddingTop: 24,
-          borderTop: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          fontFamily: 'var(--font-ibm)', fontSize: 12, color: 'var(--muted)',
-          flexWrap: 'wrap', gap: 12,
-        }}>
-          <div>{t.footer.copyright}</div>
-          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-            {['Twitter', 'Instagram', 'GitHub', 'LinkedIn'].map(name => (
-              <a key={name} href="#" style={{ color: 'var(--muted)', textDecoration: 'none' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
-              >{name}</a>
-            ))}
+            <div style={{ paddingTop: 20, borderTop: '1px solid var(--border)', fontFamily: 'var(--font-ibm)', fontSize: 11, color: 'var(--muted)' }}>
+              {t.footer.copyright}
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div style={{
+              maxWidth: 1240, margin: '0 auto',
+              display: 'grid',
+              gridTemplateColumns: isTablet ? '1fr 1fr' : '1.5fr repeat(4, 1fr)',
+              gap: 40,
+            }}>
+              <div>
+                <LumenWordmark size={18} />
+                <p style={{ marginTop: 16, fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, lineHeight: 1.6, maxWidth: 280 }}>
+                  {t.footer.about}
+                </p>
+                <div style={{ marginTop: 24 }}>
+                  <div style={{
+                    fontFamily: 'var(--font-ibm)', fontSize: 10, letterSpacing: '0.15em',
+                    textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10, fontWeight: 500,
+                  }}>{t.footer.dispatches}</div>
+                  <form onSubmit={e => e.preventDefault()} style={{ display: 'flex', gap: 6, maxWidth: 320 }}>
+                    <input type="email" placeholder={t.footer.emailPh}
+                      style={{
+                        flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: 9999, padding: '9px 16px', fontSize: 13,
+                        color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', outline: 'none',
+                      }}/>
+                    <button type="submit" style={{
+                      padding: '9px 16px', borderRadius: 9999, border: 'none',
+                      background: 'var(--candle)', color: '#fff', fontFamily: 'var(--font-syne)',
+                      fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}>{t.footer.subscribe}</button>
+                  </form>
+                </div>
+              </div>
+
+              {isTablet ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px 40px', gridColumn: '2 / -1' }}>
+                  {t.footer.cols.map(c => (
+                    <div key={c.title}>
+                      <div style={{
+                        fontFamily: 'var(--font-ibm)', fontSize: 10, letterSpacing: '0.15em',
+                        textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 500, marginBottom: 16,
+                      }}>{c.title}</div>
+                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {c.links.map(l => (
+                          <li key={l}>
+                            <a href={LINK_HREFS[l] ?? '#'} style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, textDecoration: 'none', transition: 'color .15s' }}
+                              onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
+                              onMouseLeave={e => (e.currentTarget.style.color = 'var(--sand)')}
+                            >{l}</a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                t.footer.cols.map(c => (
+                  <div key={c.title}>
+                    <div style={{
+                      fontFamily: 'var(--font-ibm)', fontSize: 10, letterSpacing: '0.15em',
+                      textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 500, marginBottom: 16,
+                    }}>{c.title}</div>
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {c.links.map(l => (
+                        <li key={l}>
+                          <a href={LINK_HREFS[l] ?? '#'} style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, textDecoration: 'none', transition: 'color .15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--sand)')}
+                          >{l}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{
+              maxWidth: 1240, margin: '40px auto 0', paddingTop: 24,
+              borderTop: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              fontFamily: 'var(--font-ibm)', fontSize: 12, color: 'var(--muted)',
+              flexWrap: 'wrap', gap: 12,
+            }}>
+              <div>{t.footer.copyright}</div>
+              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                {['Twitter', 'Instagram', 'GitHub', 'LinkedIn'].map(name => (
+                  <a key={name} href="#" style={{ color: 'var(--muted)', textDecoration: 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--candle)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
+                  >{name}</a>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </section>
     </footer>
   )

@@ -6,7 +6,7 @@ import { useBreakpoint } from './useBreakpoint'
 export function Pricing({ onCTA }: { onCTA: () => void }) {
   const { t } = useT()
   const { isMobile, isTablet } = useBreakpoint()
-  const variants = ['ghost', 'primary', 'ghost'] as const
+  const variants = ['ghost', 'ghost', 'primary', 'ghost'] as const
 
   return (
     <section id="pricing" style={{ padding: isMobile ? '72px 20px' : '120px 32px', position: 'relative' }}>
@@ -20,13 +20,44 @@ export function Pricing({ onCTA }: { onCTA: () => void }) {
 
         <div style={{
           marginTop: 64, display: 'grid',
-          gridTemplateColumns: isTablet ? '1fr' : 'repeat(3, 1fr)',
+          gridTemplateColumns: isTablet ? '1fr' : 'repeat(4, 1fr)',
           gap: 20,
           maxWidth: isTablet ? 520 : 'none',
           margin: isTablet ? '64px auto 0' : '64px 0 0',
         }}>
           {t.pricing.tiers.map((tier, i) => {
-            const popular = i === 1
+            const popular = i === 2
+            const isAgency = tier.price === ''
+
+            if (isAgency) {
+              return (
+                <div key={tier.name} style={{
+                  position: 'relative', padding: isMobile ? '28px 22px' : '36px 30px',
+                  background: 'var(--carbon)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 16, overflow: 'hidden',
+                }}>
+                  <div style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 22, color: 'var(--parchment)', letterSpacing: '-0.02em' }}>{tier.name}</div>
+                  <div style={{ marginTop: 4, fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'var(--sand)', fontWeight: 300, minHeight: 36 }}>{tier.tagline}</div>
+
+                  <div style={{ marginTop: 24, height: isMobile ? 44 : 52 }} />
+
+                  <div style={{ marginTop: 28 }}>
+                    <Button variant="ghost" size="lg" style={{ width: '100%' }} onClick={onCTA}>{tier.cta}</Button>
+                  </div>
+
+                  <div style={{ marginTop: 28, borderTop: '1px solid var(--border)', paddingTop: 22, display: 'flex', flexDirection: 'column', gap: 11 }}>
+                    {tier.features.map(f => (
+                      <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--border)' }}>radio_button_unchecked</span>
+                        <span style={{ fontFamily: 'var(--font-ibm)', fontSize: 13.5, color: 'var(--sand)', fontWeight: 300 }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+
             return (
               <div key={tier.name} style={{
                 position: 'relative', padding: isMobile ? '28px 22px' : '36px 30px',

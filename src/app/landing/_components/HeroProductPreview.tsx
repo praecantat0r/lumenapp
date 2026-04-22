@@ -43,6 +43,7 @@ export function HeroProductPreview() {
 
   const [stage, setStage] = useState(0)
   const [caption, setCaption] = useState('')
+  const [fullCaption, setFullCaption] = useState(DEFAULT_CAPTIONS[lang as 'sk' | 'en'] ?? DEFAULT_CAPTIONS.en)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>(DEFAULT_TAGS[lang as 'sk' | 'en'] ?? DEFAULT_TAGS.en)
   const [overlayText, setOverlayText] = useState('')
@@ -76,12 +77,13 @@ export function HeroProductPreview() {
       const postImageUrl = post?.render_url ?? null
 
       const parsedTags = post?.hashtags
-        ? (post.hashtags.match(/#[\w\u00C0-\u017E]+/g)?.slice(0, 4) ?? defaultTags)
+        ? (post.hashtags.match(/#[\wÀ-ž]+/g)?.slice(0, 4) ?? defaultTags)
         : defaultTags
 
       setImageUrl(postImageUrl)
       setTags(parsedTags)
       setOverlayText(captionToType.split('\n')[0].slice(0, 60) + '…')
+      setFullCaption(captionToType)
 
       let i = 0
       setCaption('')
@@ -150,25 +152,35 @@ export function HeroProductPreview() {
             }}>{t.preview.writing}</span>
           </div>
 
+          {/* Box sized by invisible full text — typed text overlaid so height never shifts */}
           <div style={{
+            position: 'relative',
             padding: 16, borderRadius: 10,
             background: 'var(--surface-2)', border: '1px solid var(--border)',
-            minHeight: isMobile ? 120 : 200,
             fontFamily: 'var(--font-syne)', fontStyle: 'italic',
-            fontSize: isMobile ? 15 : 17, lineHeight: 1.45, color: 'var(--candle)',
+            fontSize: isMobile ? 15 : 17, lineHeight: 1.45,
             textWrap: 'pretty' as React.CSSProperties['textWrap'],
             whiteSpace: 'pre-wrap',
           }}>
-            &ldquo;{caption}
-            {stage === 0 && (
-              <span style={{
-                display: 'inline-block', width: 2, height: 18,
-                marginLeft: 2, verticalAlign: 'middle',
-                background: 'var(--candle)',
-                animation: 'pp-caret 1s steps(2, end) infinite',
-              }}/>
-            )}
-            {stage > 0 && '\u201d'}
+            <span style={{ visibility: 'hidden', color: 'transparent', userSelect: 'none', pointerEvents: 'none' }}>
+              {'“'}{fullCaption}{'”'}
+            </span>
+            <span style={{
+              position: 'absolute', top: 16, left: 16, right: 16,
+              color: 'var(--candle)', whiteSpace: 'pre-wrap',
+              textWrap: 'pretty' as React.CSSProperties['textWrap'],
+            }}>
+              {'“'}{caption}
+              {stage === 0 && (
+                <span style={{
+                  display: 'inline-block', width: 2, height: 18,
+                  marginLeft: 2, verticalAlign: 'middle',
+                  background: 'var(--candle)',
+                  animation: 'pp-caret 1s steps(2, end) infinite',
+                }}/>
+              )}
+              {stage > 0 && '”'}
+            </span>
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -199,7 +211,7 @@ export function HeroProductPreview() {
 
           <div style={{
             position: 'relative',
-            aspectRatio: isMobile ? '4/3' : '3/4',
+            aspectRatio: isMobile ? '4/5' : '3/4',
             borderRadius: 10,
             overflow: 'hidden', border: '1px solid var(--border)',
             background: 'var(--surface-2)', flex: isMobile ? 'none' : 1,
