@@ -92,7 +92,7 @@ export default async function OverviewPage() {
         }
         @media (max-width: 767px) {
           .ov-main {
-            overflow-y: auto !important; overflow-x: hidden !important;
+            overflow: visible !important; flex: none !important; height: auto !important;
             padding: 12px 12px 32px !important;
           }
           .ov-bento-rows { overflow: visible !important; height: auto !important; }
@@ -108,7 +108,7 @@ export default async function OverviewPage() {
           }
           .ov-search-row { width: 100%; display: flex; gap: 8px; align-items: center; }
           .ov-search-wrap { flex: 1; min-width: 0; }
-          .ov-ghost-btn { width: 100%; justify-content: center; }
+          .ov-ghost-btn { width: auto; align-self: flex-start; font-size: 10px; padding: 5px 10px; }
         }
         @media (max-width: 480px) {
           .ov-main { padding: 8px 8px 24px !important; }

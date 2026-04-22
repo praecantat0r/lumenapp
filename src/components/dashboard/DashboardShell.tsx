@@ -39,7 +39,8 @@ export function DashboardShell({ children, initialCollapsed, ...sidebarProps }: 
             padding: 0 16px; z-index: 201; gap: 12px;
           }
           .ds-spacer { display: none !important; }
-          .ds-main { padding-top: 56px; }
+          .ds-main { padding-top: 56px; overflow-y: auto !important; overflow-x: hidden !important; }
+          .ds-inner { overflow: visible !important; flex: none !important; min-height: 100%; }
           .ds-sidebar-outer {
             width: 280px !important;
             transform: translateX(-280px) !important;
@@ -142,7 +143,7 @@ export function DashboardShell({ children, initialCollapsed, ...sidebarProps }: 
             background: 'var(--carbon)',
           }}
         >
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div className="ds-inner" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {children}
           </div>
         </main>

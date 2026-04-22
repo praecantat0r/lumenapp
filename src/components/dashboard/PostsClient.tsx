@@ -174,6 +174,11 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
 
         /* ── Filter bar ── */
         @media (max-width: 767px) {
+          .pt-content { overflow: visible !important; flex: none !important; height: auto !important; }
+        }
+
+        /* ── Filter bar ── */
+        @media (max-width: 767px) {
           .pt-filterbar { flex-direction: column !important; gap: 10px !important; padding: 10px 16px !important; }
           .pt-chips-row { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; flex-shrink: 0; scrollbar-width: none; }
           .pt-chips-row::-webkit-scrollbar { display: none; }
@@ -304,7 +309,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
       </div>
 
       {/* ── Grid ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px 48px', background: 'var(--carbon)' }}>
+      <div className="pt-content" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px 48px', background: 'var(--carbon)' }}>
         {filtered.length > 0 ? (
           <div className="pt-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
             {filtered.map(post => <PostCard key={post.id} post={post} onClick={() => openDetail(post)} />)}

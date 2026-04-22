@@ -270,6 +270,7 @@ export function BenchmarkClient() {
         .bm-run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         @keyframes bm-spin-icon { from{transform:rotate(0)} to{transform:rotate(360deg)} }
         .bm-spinning { animation: bm-spin-icon 0.8s linear infinite; display: inline-block; }
+        @media (max-width: 767px) { .bm-content { overflow: visible !important; flex: none !important; height: auto !important; } }
         .bm-tag {
           font-size: 9px; padding: 2px 7px; border-radius: 9999px;
           font-weight: 700; font-family: var(--font-ibm); letter-spacing: 0.04em;
@@ -313,7 +314,7 @@ export function BenchmarkClient() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{
+      <div className="bm-content" style={{
         flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
         padding: '20px 24px 32px',
         display: 'flex', flexDirection: 'column', gap: 16,

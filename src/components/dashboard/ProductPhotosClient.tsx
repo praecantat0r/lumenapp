@@ -500,7 +500,7 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className="pp-outer" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <style>{`
         @keyframes pp-spin { to{transform:rotate(360deg)} }
         .pp-card { position:relative; border-radius:12px; overflow:hidden; aspect-ratio:4/5; background:var(--surface-2); border:1px solid var(--border); cursor:pointer; transition:border-color 200ms,transform 200ms; }
@@ -527,6 +527,8 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
         [data-theme="light"] .pp-gallery-filter { background: var(--surface-2) !important; }
         /* ── Responsive ── */
         @media (max-width: 767px) {
+          .pp-outer { height: auto !important; overflow: visible !important; }
+          .pp-body { overflow: visible !important; flex: none !important; height: auto !important; }
           .pp-header { flex-wrap: wrap !important; gap: 10px !important; padding: 12px 16px !important; }
           .pp-header-tabs { order: 3; width: 100%; }
           .pp-header-genbtn { margin-left: auto; }
@@ -555,7 +557,7 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
       </div>
 
       {/* ── Body ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div className="pp-body" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* ═══════════════════════ PHOTOS TAB ════════════════════════════════ */}
         {mainTab === 'photos' && (

@@ -434,7 +434,7 @@ export default function StatisticsPage() {
           .st-topbar-right { width: 100%; display: flex; gap: 8px; align-items: center; }
           .st-period-btns { flex: 1; }
           .st-export-btn { flex-shrink: 0; }
-          .st-content { padding: 16px 16px 40px !important; }
+          .st-content { overflow: visible !important; flex: none !important; height: auto !important; padding: 16px 16px 40px !important; }
           .st-kpi-grid        { grid-template-columns: 1fr 1fr !important; gap: 10px !important; margin-bottom: 16px !important; }
           .st-insights-grid   { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 16px !important; }
           .st-secondary-charts{ grid-template-columns: 1fr !important; }

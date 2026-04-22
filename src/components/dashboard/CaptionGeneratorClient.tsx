@@ -92,10 +92,11 @@ export function CaptionGeneratorClient() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="cg-outer" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <style>{`
         .cg-drop:hover { border-color: rgba(182,141,64,0.4) !important; }
         .cg-drop.drag-over { border-color: var(--candle) !important; background: rgba(182,141,64,0.04) !important; }
+        @media (max-width: 767px) { .cg-outer { height: auto !important; } }
       `}</style>
 
       {/* Topbar */}
