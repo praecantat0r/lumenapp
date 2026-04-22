@@ -83,7 +83,7 @@ function App() {
         theme={state.theme}
         scrolled={scrolled}
         onThemeChange={t => update({ theme: t })}
-        onCTA={scrollToPricing}
+        onCTA={goToSignup}
       />
 
       <Hero
@@ -100,7 +100,7 @@ function App() {
       {state.sections.feed        && <FeedPreview density={state.feedDensity} />}
       {state.sections.video       && <VideoPreview />}
       {state.sections.testimonials && <Testimonials />}
-      {state.sections.pricing     && <Pricing onCTA={scrollToPricing} />}
+      {state.sections.pricing     && <Pricing onCTA={goToSignup} />}
       {state.sections.faq         && <FAQ />}
 
       <Footer onCTA={goToSignup} />
