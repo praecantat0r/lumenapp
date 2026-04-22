@@ -36,16 +36,26 @@ function mergeCanvasOverrides(objects: any[], overrides: Record<string, Record<s
 }
 
 async function renderHTMLToPNG(html: string, width: number, height: number): Promise<Buffer> {
-  const puppeteer = await import('puppeteer')
-  const browser = await puppeteer.default.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-    ],
-  })
+  const isServerless = process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let browser: any
+  if (isServerless) {
+    const chromium = (await import('@sparticuz/chromium')).default
+    const puppeteerCore = (await import('puppeteer-core')).default
+    browser = await puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless as boolean,
+    })
+  } else {
+    const puppeteer = (await import('puppeteer')).default
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    })
+  }
 
   try {
     const page = await browser.newPage()
