@@ -114,7 +114,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   const [canvasScale, setCanvasScale]   = useState(1)
   const [activeLeftTab, setActiveLeftTab] = useState<LeftTab>('canvas')
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 767 : true)
-  const [rightPanelMinimized, setRightPanelMinimized] = useState(false)
+  const [rightPanelMinimized, setRightPanelMinimized] = useState(typeof window !== 'undefined' ? window.innerWidth <= 767 : false)
   const [layers, setLayers]             = useState<LiveLayer[]>([])
 
   // Text properties
@@ -2420,6 +2420,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                     icon: 'palette', label: 'Colors', active: false,
                     action: () => {
                       if (!selectedObj) return
+                      setLeftSidebarOpen(true)
                       if (colorPickerRef.current) {
                         const cur = isText(selType) ? textColor : fillColor
                         colorPickerRef.current.value = cur.startsWith('#') ? cur : '#b68d40'
@@ -2429,7 +2430,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                   },
                   {
                     icon: 'text_fields', label: 'Type', active: false,
-                    action: () => { setActiveLeftTab('text') },
+                    action: () => { setActiveLeftTab('text'); setLeftSidebarOpen(true) },
                   },
                   {
                     icon: 'filter_b_and_w', label: 'Effects', active: showEffects,
@@ -2447,6 +2448,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                         }
                       }
                       setShowEffects(v => !v)
+                      setRightPanelMinimized(false)
                     },
                   },
                 ]).map(({ icon, label, active, action }) => (
