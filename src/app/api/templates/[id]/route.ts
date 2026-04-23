@@ -6,7 +6,7 @@ import { renderPostServer } from '@/lib/renderer'
 
 const TemplatePatchSchema = z.object({
   name:               z.string().min(1).max(200).optional(),
-  canvas_json:        z.record(z.unknown()).optional(),
+  canvas_json:        z.record(z.string(), z.unknown()).optional(),
   width:              z.number().int().min(100).max(5000).optional(),
   height:             z.number().int().min(100).max(5000).optional(),
   thumbnail_url:      z.string().url().optional(),
