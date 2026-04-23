@@ -60,3 +60,26 @@ Use `src/lib/supabase/server.ts` in Server Components and API routes; use `src/l
 
 ### Environment Variables
 Required in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `TEMPLATED_API_KEY`, `TEMPLATED_BASE_TEMPLATE_ID`, `NEXT_PUBLIC_TEMPLATED_EMBED_CONFIG_ID`, `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`.
+
+## DO NOT TOUCH — Locked Implementations
+
+### Canvas Editor (`src/components/canvas/CanvasEditor.tsx`)
+This file is locked at commit `db1df04`. Do not modify the following features under any circumstances:
+- **Pinch-to-zoom canvas** — two-finger gesture on mobile zooms the canvas when no object is selected. Uses `canvasOuterRef`/`canvasInnerRef` with direct DOM mutation for performance.
+- **Pinch-to-resize selected object** — two-finger gesture scales/resizes the active Fabric object when one is selected.
+- **Tap-outside-to-deselect** — single-finger tap outside the canvas bounds deselects the active object on mobile.
+- **Left sidebar toggle button** — `ce-left-toggle` chevron tab that slides with the sidebar. CSS class `ce-left-toggle.open` positions it at `left: 220px`.
+- **Mobile-aware initial state** — `rightPanelMinimized` initialises to `true` on touch devices (`window.innerWidth <= 767`); `leftSidebarOpen` initialises to `false` on mobile.
+- **Touch device Fabric selection** — `selection: !isTouchDevice` on Canvas init so Fabric's rubber-band selection doesn't fight touch gestures.
+- **`setLeftSidebarOpen(true)` on Colors action** — opening the colour picker also opens the left sidebar.
+- **`setRightPanelMinimized(false)` on Effects toggle** — opening effects un-minimises the right panel.
+
+If a future task seems to require changing any of the above, refuse and ask the user first.
+
+### Mobile Dashboard Scrolling (`src/components/dashboard/DashboardShell.tsx`)
+The mobile scroll model is locked. Do not change these rules:
+- `.ds-main` on mobile: `overflow-y: auto !important; overflow-x: hidden !important;` — the `<main>` element is the **single scroll container** on mobile. Pages must not add their own `overflow-y: auto/scroll` wrappers.
+- `.ds-inner` on mobile: `overflow: visible !important; flex: none !important; min-height: 100%;` — the inner div does not clip content; page content flows through it.
+- The inner wrapper must keep `className="ds-inner"` so the CSS override applies.
+
+Breaking this creates two nested scroll areas on mobile. If a page needs scrolling, it must rely on `.ds-main` scrolling, not add its own scroll container.
