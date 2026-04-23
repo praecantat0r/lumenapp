@@ -24,21 +24,17 @@ export async function GET(req: NextRequest) {
 
   try {
     // Parallel fetches: daily insights, profile (followers_count field), lifetime follower metric, media
+    // Use /me — the stored user-id is an Instagram-scoped ID that only works via /me with this token type
     const [reachImpRes, profileRes, follMetricRes, mediaRes] = await Promise.all([
-      fetch(`${IG_BASE}/${igUserId}/insights?metric=impressions,reach&period=day&since=${since}&until=${until}&access_token=${accessToken}`),
-      fetch(`${IG_BASE}/${igUserId}?fields=followers_count&access_token=${accessToken}`),
-      fetch(`${IG_BASE}/${igUserId}/insights?metric=follower_count&period=lifetime&access_token=${accessToken}`),
-      fetch(`${IG_BASE}/${igUserId}/media?fields=id,caption,timestamp,like_count,comments_count&limit=50&access_token=${accessToken}`)
+      fetch(`${IG_BASE}/me/insights?metric=impressions,reach&period=day&since=${since}&until=${until}&access_token=${accessToken}`),
+      fetch(`${IG_BASE}/me?fields=followers_count,media_count&access_token=${accessToken}`),
+      fetch(`${IG_BASE}/me/insights?metric=follower_count&period=lifetime&access_token=${accessToken}`),
+      fetch(`${IG_BASE}/me/media?fields=id,caption,timestamp,like_count,comments_count&limit=50&access_token=${accessToken}`)
     ])
 
     const [reachImpData, profileData, follMetricData, mediaData] = await Promise.all([
       reachImpRes.json(), profileRes.json(), follMetricRes.json(), mediaRes.json()
     ])
-
-    if (reachImpData.error) console.warn('IG stats reach/imp error:', JSON.stringify(reachImpData.error))
-    if (profileData.error)  console.warn('IG stats profile error:',   JSON.stringify(profileData.error))
-    if (follMetricData.error) console.warn('IG stats follower error:', JSON.stringify(follMetricData.error))
-    if (mediaData.error)    console.warn('IG stats media error:',     JSON.stringify(mediaData.error))
 
     // Resolve follower count: try profile field first, fall back to lifetime metric
     const followerFromProfile: number = profileData.followers_count ?? 0

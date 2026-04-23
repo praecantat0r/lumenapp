@@ -29,7 +29,7 @@ interface StatsData {
 }
 
 interface ParsedStats {
-  kpi: { followers: string; reach: string; impressions: string; eng: string }
+  kpi: { followers: string; likes: string; views: string; eng: string }
   reachData:    Array<{ date: string; reach: number; prev: number }>
   followData:   Array<{ week: string; new: number; lost: number }>
   engData:      Array<{ post: string; rate: number }>
@@ -55,7 +55,7 @@ const MOCK_SOURCES = [
 
 const MOCK: Record<Period, ParsedStats> = {
   7: {
-    kpi: { followers:'2,841', reach:'18.4k', impressions:'31k', eng:'5.1%' },
+    kpi: { followers:'2,841', likes:'1,183', views:'31k', eng:'5.1%' },
     reachData: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i) => ({ date:d, reach:[2100,3400,2800,4200,3600,5812,4900][i], prev:[1800,2900,2200,3100,2900,4200,3800][i] })),
     followData: ['W–4','W–3','W–2','W–1','This'].map((w,i) => ({ week:w, new:[18,24,21,28,31][i], lost:[-4,-6,-3,-8,-5][i] })),
     engData: Array.from({length:10},(_,i)=>({ post:`P${i+1}`, rate:[3.8,5.1,6.4,4.2,4.9,3.2,5.8,4.1,6.1,3.6][i] })),
@@ -70,7 +70,7 @@ const MOCK: Record<Period, ParsedStats> = {
     netFollChange: 118,
   },
   30: {
-    kpi: { followers:'2,841', reach:'84.2k', impressions:'142k', eng:'4.8%' },
+    kpi: { followers:'2,841', likes:'4,240', views:'142k', eng:'4.8%' },
     reachData: Array.from({length:30},(_,i)=>{ const d=new Date(2026,2,28); d.setDate(d.getDate()-29+i); return { date:`${d.getDate()}/${d.getMonth()+1}`, reach:[1800,2100,1600,2400,2900,2200,3100,2600,3400,2800,3200,2400,3800,3100,2700,4200,3600,3900,3200,4500,3800,4100,3500,5200,4600,4900,5812,5100,4700,5400][i], prev:[1400,1700,1300,1900,2300,1800,2500,2100,2700,2200,2600,1900,3100,2500,2200,3400,2900,3100,2600,3700,3100,3300,2800,4200,3700,3900,4600,4100,3800,4300][i] } }),
     followData: ['W1','W2','W3','W4'].map((w,i)=>({ week:w, new:[22,31,28,37][i], lost:[-5,-8,-6,-9][i] })),
     engData: Array.from({length:10},(_,i)=>({ post:`P${i+1}`, rate:[3.8,5.1,6.4,4.2,4.9,3.2,5.8,4.1,6.1,3.6][i] })),
@@ -85,7 +85,7 @@ const MOCK: Record<Period, ParsedStats> = {
     netFollChange: 118,
   },
   90: {
-    kpi: { followers:'2,841', reach:'248k', impressions:'412k', eng:'4.4%' },
+    kpi: { followers:'2,841', likes:'12,810', views:'412k', eng:'4.4%' },
     reachData: Array.from({length:12},(_,i)=>({ date:`W${i+1}`, reach:[12000,14500,11800,16200,15400,18900,17200,20100,19400,22600,24100,26800][i], prev:[9800,11200,9400,13100,12400,15200,13900,16400,15800,18200,19500,21600][i] })),
     followData: ['Jan','Feb','Mar'].map((w,i)=>({ week:w, new:[68,84,118][i], lost:[-18,-22,-28][i] })),
     engData: Array.from({length:10},(_,i)=>({ post:`P${i+1}`, rate:[3.4,4.8,5.9,3.8,4.5,2.9,5.2,3.7,5.6,3.3][i] })),
@@ -100,10 +100,11 @@ const MOCK: Record<Period, ParsedStats> = {
 }
 
 function parseApiData(data: StatsData, period: Period): ParsedStats | null {
-  // Require at least some media or insight data to avoid rendering mock values as "live"
   const hasMedia    = (data.media?.length ?? 0) > 0
   const hasInsights = (data.insights?.length ?? 0) > 0
   if (!hasMedia && !hasInsights) return null
+
+  const media = data.media ?? []
 
   const reachMetric = data.insights?.find(m => m.name === 'reach')
   const impMetric   = data.insights?.find(m => m.name === 'impressions')
@@ -113,27 +114,26 @@ function parseApiData(data: StatsData, period: Period): ParsedStats | null {
   const impVals   = impMetric?.values ?? []
   const follVals  = follMetric?.values ?? []
 
-  const totalReach       = reachVals.reduce((s, v) => s + v.value, 0)
   const totalImpressions = impVals.reduce((s, v) => s + v.value, 0)
   const currentFollowers = follVals.length ? follVals[follVals.length - 1].value : 0
   const netFollChange    = follVals.length > 1 ? follVals[follVals.length - 1].value - follVals[0].value : 0
 
-  // Reach over time (only build from insights if we have values)
+  // Views over time: prefer daily impressions insights, then reach insights, then aggregate from posts
+  const chartVals = impVals.length ? impVals : reachVals
   let reachData: ParsedStats['reachData'] = []
-  if (reachVals.length) {
+  if (chartVals.length) {
     if (period === 7) {
-      reachData = reachVals.slice(-7).map(v => ({
+      reachData = chartVals.slice(-7).map(v => ({
         date: new Date(v.end_time).toLocaleDateString('en', { weekday: 'short' }),
-        reach: v.value,
-        prev: 0,
+        reach: v.value, prev: 0,
       }))
     } else if (period === 30) {
-      reachData = reachVals.slice(-30).map(v => {
+      reachData = chartVals.slice(-30).map(v => {
         const d = new Date(v.end_time)
         return { date: `${d.getDate()}/${d.getMonth() + 1}`, reach: v.value, prev: 0 }
       })
     } else {
-      const last = reachVals.slice(-84)
+      const last = chartVals.slice(-84)
       const weeks: ParsedStats['reachData'] = []
       for (let i = 0; i < 12; i++) {
         const chunk = last.slice(i * 7, (i + 1) * 7)
@@ -142,9 +142,28 @@ function parseApiData(data: StatsData, period: Period): ParsedStats | null {
       }
       reachData = weeks
     }
+  } else if (media.length) {
+    // Build from post timestamps; use impressions > reach > likes as the value
+    const dateMap: Record<string, number> = {}
+    for (const post of media) {
+      if (!post.timestamp) continue
+      const d = new Date(post.timestamp)
+      const val = (post.impressions ?? 0) || (post.reach ?? 0) || (post.like_count ?? 0)
+      let key: string
+      if (period <= 7) {
+        key = d.toLocaleDateString('en', { weekday: 'short' })
+      } else if (period <= 30) {
+        key = `${d.getDate()}/${d.getMonth() + 1}`
+      } else {
+        const weeksAgo = Math.floor((Date.now() - d.getTime()) / (7 * 24 * 3600 * 1000))
+        key = `W${Math.min(12, weeksAgo + 1)}`
+      }
+      dateMap[key] = (dateMap[key] ?? 0) + val
+    }
+    reachData = Object.entries(dateMap).map(([date, reach]) => ({ date, reach, prev: 0 }))
   }
 
-  // Follower growth by week
+  // Follower growth by week (requires time series — only available with Business insights)
   const numWeeks = period === 7 ? 5 : period === 30 ? 4 : 3
   const weekLabels: Record<number, string[]> = {
     7: ['W–4','W–3','W–2','W–1','This'],
@@ -165,9 +184,12 @@ function parseApiData(data: StatsData, period: Period): ParsedStats | null {
       })
     }
   }
+  // No time series — show current follower count as a single snapshot bar
+  if (!followData.length && currentFollowers > 0) {
+    followData.push({ week: 'Now', new: currentFollowers, lost: 0 })
+  }
 
-  // Top posts — sorted by interactions
-  const media = data.media ?? []
+  // Top posts sorted by interactions
   const sorted = [...media].sort(
     (a, b) => ((b.like_count ?? 0) + (b.comments_count ?? 0)) - ((a.like_count ?? 0) + (a.comments_count ?? 0))
   )
@@ -191,7 +213,7 @@ function parseApiData(data: StatsData, period: Period): ParsedStats | null {
     }
   })
 
-  // Engagement by post (chronological order for chart)
+  // Engagement rate per post (chronological)
   const engData: ParsedStats['engData'] = media.slice(0, 10).map((post, i) => {
     const interactions = (post.like_count ?? 0) + (post.comments_count ?? 0)
     const denom = post.reach || currentFollowers || 1
@@ -202,20 +224,19 @@ function parseApiData(data: StatsData, period: Period): ParsedStats | null {
     ? (engData.reduce((s, e) => s + e.rate, 0) / engData.length).toFixed(1) + '%'
     : '—'
 
-  // If insights gave us nothing but media has per-post reach, sum those as proxy totals
-  const mediaReachTotal = totalReach || (data.media ?? []).reduce((s, p) => s + (p.reach ?? 0), 0)
-  const mediaImpTotal   = totalImpressions || (data.media ?? []).reduce((s, p) => s + (p.impressions ?? 0), 0)
+  const totalLikes = media.reduce((s, p) => s + (p.like_count ?? 0), 0)
+  const totalViews = totalImpressions || media.reduce((s, p) => s + (p.impressions ?? 0), 0)
 
   return {
     kpi: {
       followers: currentFollowers ? fmt(currentFollowers) : '—',
-      reach: mediaReachTotal ? fmt(mediaReachTotal) : '—',
-      impressions: mediaImpTotal ? fmt(mediaImpTotal) : '—',
+      likes: totalLikes ? fmt(totalLikes) : '—',
+      views: totalViews ? fmt(totalViews) : '—',
       eng: avgEng,
     },
-    reachData: reachData.length ? reachData : MOCK[period].reachData,
-    followData: followData.length ? followData : MOCK[period].followData,
-    engData: engData.length ? engData : MOCK[period].engData,
+    reachData,
+    followData,
+    engData,
     sources: MOCK_SOURCES,
     topPosts: topPosts.length ? topPosts : MOCK[period].topPosts,
     netFollChange,
@@ -259,7 +280,12 @@ export default function StatisticsPage() {
   const d          = parsedData ?? MOCK[period]
   const kpi        = d.kpi
 
-  const engColors = d.engData.map(v => v.rate >= 5 ? CANDLE : v.rate >= 4 ? 'rgba(212,168,75,.65)' : 'rgba(212,168,75,.38)')
+  const maxEngRate = d.engData.length ? Math.max(...d.engData.map(e => e.rate)) : 8
+  const engYMax   = Math.max(8, Math.ceil(maxEngRate * 1.15))
+  const engColors = d.engData.map(v => {
+    const pct = maxEngRate > 0 ? v.rate / maxEngRate : 0
+    return pct >= 0.75 ? CANDLE : pct >= 0.45 ? 'rgba(212,168,75,.65)' : 'rgba(212,168,75,.38)'
+  })
 
   const follTrend = parsedData
     ? (d.netFollChange >= 0 ? `+${fmt(d.netFollChange)} this period` : `${fmt(d.netFollChange)} this period`)
@@ -267,8 +293,8 @@ export default function StatisticsPage() {
 
   const kpiItems = [
     { label:'Total followers',   val:kpi.followers,   trend: follTrend,           spark:'M0,28 L13,22 L26,24 L40,14 L53,17 L66,8 L80,5' },
-    { label:'Total reach',       val:kpi.reach,       trend:'+22% vs prev.',      spark:'M0,26 L13,20 L26,22 L40,12 L53,15 L66,6 L80,3' },
-    { label:'Impressions',       val:kpi.impressions, trend:'+18% vs prev.',      spark:'M0,24 L13,18 L26,20 L40,10 L53,13 L66,5 L80,2' },
+    { label:'Post likes',        val:kpi.likes,       trend:'+15% vs prev.',      spark:'M0,26 L13,20 L26,22 L40,12 L53,15 L66,6 L80,3' },
+    { label:'Overall views',     val:kpi.views,       trend:'+18% vs prev.',      spark:'M0,24 L13,18 L26,20 L40,10 L53,13 L66,5 L80,2' },
     { label:'Avg. engagement',   val:kpi.eng,         trend:'+0.6pp',             spark:'M0,22 L13,19 L26,21 L40,14 L53,16 L66,10 L80,7' },
   ]
 
@@ -523,11 +549,11 @@ export default function StatisticsPage() {
           <div style={{ background:'var(--surface-2)', border:'1px solid rgba(78,69,56,0.2)', borderRadius:20, padding:'24px 24px 16px' }}>
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20 }}>
               <div>
-                <div style={{ fontFamily:'var(--font-syne)', fontSize:16, fontWeight:700, color:'var(--parchment)', letterSpacing:'-.02em' }}>Reach over time</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:4 }}>Daily unique content impressions across all platforms.</div>
+                <div style={{ fontFamily:'var(--font-syne)', fontSize:16, fontWeight:700, color:'var(--parchment)', letterSpacing:'-.02em' }}>Views over time</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:4 }}>Total content views across all published posts.</div>
               </div>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontFamily:'var(--font-syne)', fontSize:26, fontWeight:800, color:'var(--candle)', letterSpacing:'-.03em' }}>{kpi.reach}</div>
+                <div style={{ fontFamily:'var(--font-syne)', fontSize:26, fontWeight:800, color:'var(--candle)', letterSpacing:'-.03em' }}>{kpi.views}</div>
                 <div style={{ fontSize:11, color:'#6EBF8B', marginTop:2 }}>this period</div>
               </div>
             </div>
@@ -565,7 +591,9 @@ export default function StatisticsPage() {
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20 }}>
               <div>
                 <div style={{ fontFamily:'var(--font-syne)', fontSize:13, fontWeight:600, color:'var(--parchment)', letterSpacing:'-.02em' }}>Follower growth</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:4 }}>Net new followers per week</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:4 }}>
+                  {parsedData && d.followData.length === 1 ? 'Current follower total' : 'Net new followers per week'}
+                </div>
               </div>
               <div style={{ textAlign:'right' }}>
                 <div style={{ fontFamily:'var(--font-syne)', fontSize:24, fontWeight:700, color:CANDLE, letterSpacing:'-.03em' }}>
@@ -579,17 +607,22 @@ export default function StatisticsPage() {
                 <XAxis dataKey="week" tick={axisStyle} axisLine={false} tickLine={false}/>
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={32}/>
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color:'#F6F2EA' }} labelStyle={{ color:'rgba(246,242,234,.6)', fontSize:10 }}/>
-                <Bar dataKey="new"  fill="rgba(212,168,75,.75)" radius={[5,5,0,0]} name="New followers" barSize={18}/>
-                <Bar dataKey="lost" fill="rgba(224,112,112,.55)" radius={[5,5,0,0]} name="Unfollows" barSize={18}/>
+                <Bar dataKey="new"  fill="rgba(212,168,75,.75)" radius={[5,5,0,0]} name={parsedData && d.followData.length === 1 ? 'Total followers' : 'New followers'} barSize={18}/>
+                {(!parsedData || d.followData.length !== 1) && (
+                  <Bar dataKey="lost" fill="rgba(224,112,112,.55)" radius={[5,5,0,0]} name="Unfollows" barSize={18}/>
+                )}
               </BarChart>
             </ResponsiveContainer>
             <div style={{ display:'flex', gap:18, marginTop:12 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:10, color:'rgba(246,242,234,.32)', fontFamily:'var(--font-ibm)' }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background:CANDLE }}/> New followers
+                <div style={{ width:8, height:8, borderRadius:'50%', background:CANDLE }}/>
+                {parsedData && d.followData.length === 1 ? 'Total followers' : 'New followers'}
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:10, color:'rgba(246,242,234,.32)', fontFamily:'var(--font-ibm)' }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background:RED }}/> Unfollows
-              </div>
+              {(!parsedData || d.followData.length !== 1) && (
+                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:10, color:'rgba(246,242,234,.32)', fontFamily:'var(--font-ibm)' }}>
+                  <div style={{ width:8, height:8, borderRadius:'50%', background:RED }}/> Unfollows
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -612,7 +645,7 @@ export default function StatisticsPage() {
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={d.engData} margin={{ top:5, right:5, bottom:0, left:0 }}>
                 <XAxis dataKey="post" tick={axisStyle} axisLine={false} tickLine={false}/>
-                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={28} tickFormatter={v=>`${v}%`} domain={[0,8]}/>
+                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={28} tickFormatter={v=>`${v}%`} domain={[0, engYMax]}/>
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color:'#F6F2EA' }} labelStyle={{ color:'rgba(246,242,234,.6)', fontSize:10 }}/>
                 <Bar dataKey="rate" radius={[4,4,0,0]} barSize={16} name="Eng. rate">
                   {d.engData.map((_entry, i) => <Cell key={i} fill={engColors[i]}/>)}
