@@ -17,6 +17,7 @@ const ASSET_TYPES: { value: BrandAsset['type']; label: string; icon: string }[] 
   { value: 'label',         label: 'Label / sticker', icon: 'sell'            },
   { value: 'logo',          label: 'Logo',            icon: 'brand_awareness' },
   { value: 'photo',         label: 'Scene / photo',   icon: 'landscape'       },
+  { value: 'screenshot',    label: 'App screenshot',  icon: 'computer'        },
   { value: 'other',         label: 'Other',           icon: 'category'        },
 ]
 

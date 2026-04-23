@@ -7,13 +7,14 @@ import type { BrandAsset } from '@/types'
 type AssetMode = 'original' | 'auto' | 'specific' | 'composite'
 
 const ASSET_TYPE_CONFIG: Record<string, { icon: string; label: string }> = {
-  product_photo: { icon: 'inventory_2',     label: 'Product' },
-  label:         { icon: 'sell',            label: 'Label' },
-  logo:          { icon: 'brand_awareness', label: 'Logo' },
-  photo:         { icon: 'landscape',       label: 'Scene' },
-  place_photo:   { icon: 'storefront',      label: 'Location' },
-  icon:          { icon: 'emoji_objects',   label: 'Icon' },
-  other:         { icon: 'category',        label: 'Other' },
+  product_photo: { icon: 'inventory_2',     label: 'Product photo'   },
+  label:         { icon: 'sell',            label: 'Label / sticker' },
+  logo:          { icon: 'brand_awareness', label: 'Logo'            },
+  photo:         { icon: 'landscape',       label: 'Scene / photo'   },
+  place_photo:   { icon: 'storefront',      label: 'Location'        },
+  screenshot:    { icon: 'computer',        label: 'App screenshot'  },
+  icon:          { icon: 'emoji_objects',   label: 'Icon'            },
+  other:         { icon: 'category',        label: 'Other'           },
 }
 const ASSET_ICON_COLOR = '#b68d40'
 

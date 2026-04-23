@@ -648,6 +648,20 @@ After that opening, describe:
 ③ ${brandBrain.include_people === false ? 'Any product, animal, or natural subject in the foreground (NO people or human figures, NO signs or boards)' : 'Any people, animal, or subject in the foreground (if relevant) — NO signs or boards'}, clearly distinct from the background
 ④ The lighting as it appears in the reference photo — preserve its quality and temperature
 End the IMAGE_PROMPT with: "ultra-high resolution, authentic atmosphere, no digital screens, no text overlays, no underglow, no neon ground lighting, no light strips beneath objects, no unrelated props"\n`
+          : assetGuidance.type === 'screenshot'
+          ? `The user has uploaded an APP SCREENSHOT as the reference image. This screenshot will be passed to NanoBanana alongside your prompt.
+
+Your IMAGE_PROMPT must describe a cinematic tech product mockup photograph: the reference screenshot displayed on a sleek modern laptop (MacBook-style, silver aluminium, open lid) placed on a dark surface. The screen must be clearly legible — not at a steep isometric angle.
+
+Your IMAGE_PROMPT MUST begin with: "Using the attached reference image as the laptop screen content — display this exact screenshot on the screen of a sleek open laptop —"
+
+After that opening, describe:
+① The laptop: modern silver/aluminium MacBook-style laptop, lid open at approximately 110–120 degrees, the reference screenshot filling the screen cleanly and legibly
+② Placement and angle: laptop centred in frame, slight 3/4 perspective with the camera at roughly screen height — NOT a steep isometric top-down tilt; the screen UI should be comfortably readable
+③ Surface: dark walnut wood desk, dark marble slab, or matte dark table
+④ Background: dark and moody, out-of-focus, with soft warm bokeh ambient lights in the far background (evening office or café atmosphere)
+⑤ Lighting: soft directional light from slightly front-left or front-right, gently illuminating the keyboard and bezel, deep shadows on the desk surface
+End the IMAGE_PROMPT with: "ultra-high resolution, professional tech product photography, no text overlays, no additional devices, no props, no underglow, no neon ground lighting, no light strips beneath objects"\n`
           : `The user has selected a specific brand asset. This exact asset image will be passed as a reference image to NanoBanana alongside your prompt.
 ${assetGuidance.description ? `ASSET DETAILS — MANDATORY: Apply these specific facts when building the scene:\n${assetGuidance.description}\n` : ''}
 CRITICAL PLACEMENT RULE: This asset is a label, logo, sticker, or packaging graphic. You MUST place it applied onto the appropriate physical product — infer the product from the brand's industry (e.g. a honey label goes on a honey jar, a coffee label on a bag or cup, a skincare label on a bottle or tin). Do NOT float it as a standalone object, lean it against a surface, or treat it as a decorative prop.

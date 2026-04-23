@@ -27,7 +27,9 @@ export interface RenderResult {
 
 // Server-side: calls /api/render using absolute URL
 export async function renderPostServer(input: RenderInput): Promise<RenderResult> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.NODE_ENV === 'production'
+    ? (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')
+    : 'http://localhost:3000'
   const res = await fetch(`${baseUrl}/api/render`, {
     method: 'POST',
     headers: {

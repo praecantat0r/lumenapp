@@ -49,7 +49,7 @@ export interface BrandAsset {
   name?: string
   storage_path: string
   public_url: string
-  type: 'product_photo' | 'place_photo' | 'label' | 'logo' | 'photo' | 'icon' | 'other'
+  type: 'product_photo' | 'place_photo' | 'label' | 'logo' | 'photo' | 'screenshot' | 'icon' | 'other'
   tags: string[]
   description?: string
   created_at: string
