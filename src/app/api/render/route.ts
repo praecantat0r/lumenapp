@@ -36,16 +36,32 @@ function mergeCanvasOverrides(objects: any[], overrides: Record<string, Record<s
 }
 
 async function renderHTMLToPNG(html: string, width: number, height: number): Promise<Buffer> {
-  const puppeteer = await import('puppeteer')
-  const browser = await puppeteer.default.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-    ],
-  })
+  // In serverless environments (Vercel/Lambda) use @sparticuz/chromium + puppeteer-core.
+  // In local dev, fall back to full puppeteer which manages its own Chrome binary.
+  const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV)
+
+  let browser: import('puppeteer-core').Browser
+  if (isServerless) {
+    const chromium = (await import('@sparticuz/chromium')).default
+    const puppeteerCore = await import('puppeteer-core')
+    browser = await puppeteerCore.default.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless as true,
+    })
+  } else {
+    const puppeteer = await import('puppeteer')
+    browser = await puppeteer.default.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    }) as unknown as import('puppeteer-core').Browser
+  }
 
   try {
     const page = await browser.newPage()
