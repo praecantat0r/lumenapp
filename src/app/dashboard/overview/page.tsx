@@ -110,7 +110,8 @@ export default async function OverviewPage() {
             padding: 16px 16px !important; align-items: flex-start !important;
           }
           .ov-topbar-actions {
-            width: 100%; display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+            width: 100% !important; display: flex !important; flex-direction: column !important;
+            gap: 6px !important; align-items: flex-start !important;
           }
           .ov-ta-row1 { display: flex; gap: 8px; align-items: center; width: 100%; }
           .ov-search-wrap { flex: 1; min-width: 120px; }
