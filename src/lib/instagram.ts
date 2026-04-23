@@ -1,13 +1,13 @@
-const IG_BASE = 'https://graph.instagram.com/v18.0'
+const IG_BASE = 'https://graph.instagram.com/v21.0'
 
 export async function publishToInstagram(
-  igUserId: string,
+  _igUserId: string,
   accessToken: string,
   imageUrl: string,
   caption: string
 ): Promise<{ instagram_post_id: string; permalink: string }> {
   // Step A: Create media container
-  const containerRes = await fetch(`${IG_BASE}/${igUserId}/media`, {
+  const containerRes = await fetch(`${IG_BASE}/me/media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -20,7 +20,7 @@ export async function publishToInstagram(
   if (!containerData.id) throw new Error(`IG container creation failed: ${JSON.stringify(containerData)}`)
 
   // Step B: Publish container
-  const publishRes = await fetch(`${IG_BASE}/${igUserId}/media_publish`, {
+  const publishRes = await fetch(`${IG_BASE}/me/media_publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -50,14 +50,14 @@ export async function refreshInstagramToken(accessToken: string): Promise<{ acce
   return res.json()
 }
 
-export async function getInstagramStats(igUserId: string, accessToken: string, since: number, until: number) {
+export async function getInstagramStats(accessToken: string, since: number, until: number) {
   const insightsRes = await fetch(
-    `${IG_BASE}/${igUserId}/insights?metric=impressions,reach,profile_views,follower_count&period=day&since=${since}&until=${until}&access_token=${accessToken}`
+    `${IG_BASE}/me/insights?metric=impressions,reach,profile_views,follower_count&period=day&since=${since}&until=${until}&access_token=${accessToken}`
   )
   const insights = await insightsRes.json()
 
   const mediaRes = await fetch(
-    `${IG_BASE}/${igUserId}/media?fields=id,caption,media_url,timestamp,like_count,comments_count&access_token=${accessToken}`
+    `${IG_BASE}/me/media?fields=id,caption,media_url,timestamp,like_count,comments_count&access_token=${accessToken}`
   )
   const media = await mediaRes.json()
 

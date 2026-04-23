@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const until = Math.floor(Date.now() / 1000)
   const since = until - periodDays * 24 * 60 * 60
 
-  const { instagram_user_id: igUserId, access_token: accessToken } = igConn
+  const { access_token: accessToken } = igConn
 
   try {
     // Parallel fetches: daily insights, profile (followers_count field), lifetime follower metric, media

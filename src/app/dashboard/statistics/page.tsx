@@ -460,7 +460,7 @@ export default function StatisticsPage() {
           .st-topbar-right { width: 100%; display: flex; gap: 8px; align-items: center; }
           .st-period-btns { flex: 1; }
           .st-export-btn { flex-shrink: 0; }
-          .st-content { padding: 16px 16px 40px !important; }
+          .st-content { overflow: visible !important; flex: none !important; height: auto !important; padding: 16px 16px 40px !important; }
           .st-kpi-grid        { grid-template-columns: 1fr 1fr !important; gap: 10px !important; margin-bottom: 16px !important; }
           .st-insights-grid   { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 16px !important; }
           .st-secondary-charts{ grid-template-columns: 1fr !important; }
@@ -608,9 +608,7 @@ export default function StatisticsPage() {
                 <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={32}/>
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color:'#F6F2EA' }} labelStyle={{ color:'rgba(246,242,234,.6)', fontSize:10 }}/>
                 <Bar dataKey="new"  fill="rgba(212,168,75,.75)" radius={[5,5,0,0]} name={parsedData && d.followData.length === 1 ? 'Total followers' : 'New followers'} barSize={18}/>
-                {(!parsedData || d.followData.length !== 1) && (
-                  <Bar dataKey="lost" fill="rgba(224,112,112,.55)" radius={[5,5,0,0]} name="Unfollows" barSize={18}/>
-                )}
+                <Bar dataKey="lost" fill="rgba(224,112,112,.55)" radius={[5,5,0,0]} name="Unfollows" barSize={18} hide={parsedData !== null && d.followData.length === 1}/>
               </BarChart>
             </ResponsiveContainer>
             <div style={{ display:'flex', gap:18, marginTop:12 }}>
