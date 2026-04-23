@@ -110,8 +110,8 @@ export default async function OverviewPage() {
           .ov-search-wrap { flex: 1; min-width: 120px; order: 1; }
           .ov-generate-wrap { order: 2; flex-shrink: 0; }
           .ov-view-all-posts {
-            order: 3; font-size: 10px !important; padding: 3px 10px !important;
-            opacity: 0.75;
+            order: 3; flex-basis: 100%; font-size: 10px !important; padding: 3px 10px !important;
+            opacity: 0.75; width: fit-content;
           }
         }
         @media (max-width: 480px) {
