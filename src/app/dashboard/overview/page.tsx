@@ -85,10 +85,6 @@ export default async function OverviewPage() {
         .ov-adj:hover{background:rgba(182,141,64,0.22)!important}
         .ov-callink:hover{color:var(--candle)!important}
 
-        /* ── Topbar actions (desktop) ── */
-        .ov-topbar-actions { display: flex; gap: 8px; align-items: center; }
-        .ov-ta-row1 { display: flex; gap: 8px; align-items: center; }
-        .ov-search-wrap { min-width: 120px; }
 
         /* ── Responsive ── */
         @media (max-width: 1024px) {
@@ -110,12 +106,11 @@ export default async function OverviewPage() {
             padding: 16px 16px !important; align-items: flex-start !important;
           }
           .ov-topbar-actions {
-            width: 100% !important; display: flex !important; flex-direction: column !important;
-            gap: 6px !important; align-items: flex-start !important;
+            width: 100%; display: flex; gap: 8px; align-items: center; flex-direction: column;
           }
-          .ov-ta-row1 { display: flex; gap: 8px; align-items: center; width: 100%; }
-          .ov-search-wrap { flex: 1; min-width: 120px; }
-          .ov-generate-wrap { flex-shrink: 0; }
+          .ov-search-row { width: 100%; display: flex; gap: 8px; align-items: center; }
+          .ov-search-wrap { flex: 1; min-width: 0; }
+          .ov-ghost-btn { width: auto; align-self: flex-start; font-size: 10px; padding: 5px 10px; }
         }
         @media (max-width: 480px) {
           .ov-main { padding: 8px 8px 24px !important; }
@@ -133,10 +128,10 @@ export default async function OverviewPage() {
           <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600 }}>Lumen Dashboard</span>
           <h1 style={{ fontFamily: 'var(--font-syne)', fontSize: 32, fontWeight: 800, letterSpacing: '-.03em', color: 'var(--parchment)', lineHeight: 1.1, marginTop: 4 }}>Overview</h1>
         </div>
-        <div className="ov-topbar-actions">
-          <div className="ov-ta-row1">
+        <div className="ov-topbar-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="ov-search-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div className="ov-search-wrap"><OverviewSearch /></div>
-            <div className="ov-generate-wrap"><OverviewGenerateButton /></div>
+            <OverviewGenerateButton />
           </div>
           <a href="/dashboard/posts" className="ov-ghost-btn">View all posts</a>
         </div>
