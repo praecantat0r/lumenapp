@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { describeImageForCaption } from '@/lib/anthropic'
 import { generateCaption } from '@/lib/openai'
 import { buildBrandContext } from '@/lib/context-builder'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import type { BrandBrain } from '@/types'
 
 export const maxDuration = 60
@@ -11,6 +12,8 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (!rateLimit(`caption:${user.id}`, 20, 60_000)) return rateLimitResponse()
 
   const { imageUrl } = await req.json().catch(() => ({}))
   if (!imageUrl) return NextResponse.json({ error: 'imageUrl required' }, { status: 400 })

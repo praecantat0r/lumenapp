@@ -34,10 +34,21 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (pathname.startsWith('/dashboard/benchmark') && user?.email !== process.env.ADMIN_EMAIL) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard/overview'
-    return NextResponse.redirect(url)
+  if (pathname.startsWith('/dashboard/benchmark')) {
+    let isAdmin = false
+    if (user) {
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single()
+      isAdmin = roleData?.role === 'admin'
+    }
+    if (!isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard/overview'
+      return NextResponse.redirect(url)
+    }
   }
 
   if (isAuth && user) {

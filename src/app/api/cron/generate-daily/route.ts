@@ -5,12 +5,17 @@ import { generateOriginalImagePrompt, validatePost } from '@/lib/anthropic'
 import { buildBrandContext } from '@/lib/context-builder'
 import { generateImage } from '@/lib/nanobanana'
 import { renderPostServer, getOrSeedTemplateId } from '@/lib/renderer'
+import { rateLimit } from '@/lib/rate-limit'
 import type { BrandBrain } from '@/types'
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!rateLimit('cron:generate-daily', 5, 24 * 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
   const supabase = await createClient()

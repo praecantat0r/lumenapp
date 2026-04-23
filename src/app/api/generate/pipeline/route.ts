@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export const maxDuration = 300
 import { createServiceClient } from '@/lib/supabase/service'
@@ -13,6 +14,8 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (!rateLimit(`gen:${user.id}`, 10, 60_000)) return rateLimitResponse()
 
   const { data: profile } = await supabase
     .from('profiles')

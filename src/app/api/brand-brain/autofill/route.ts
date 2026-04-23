@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { createClient } from '@/lib/supabase/server'
+import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const TONES = ['Professional','Friendly','Inspiring','Authoritative','Playful',
                'Luxurious','Minimal','Bold','Warm','Humorous','Informative','Passionate']
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (!rateLimit(`autofill:${user.id}`, 10, 60_000)) return rateLimitResponse()
+
   try {
     const body = await req.json()
     const {

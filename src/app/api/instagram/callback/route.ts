@@ -36,10 +36,13 @@ export async function GET(req: NextRequest) {
     const igUserId = tokenData.user_id?.toString()
     if (!igUserId) throw new Error(`No user_id in token response: ${JSON.stringify(tokenData)}`)
 
-    // Exchange for long-lived token (60 days)
-    const llRes = await fetch(
-      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${process.env.INSTAGRAM_APP_SECRET}&access_token=${tokenData.access_token}`
-    )
+    // Exchange for long-lived token
+    const llParams = new URLSearchParams({
+      grant_type: 'ig_exchange_token',
+      client_secret: process.env.INSTAGRAM_APP_SECRET!,
+      access_token: tokenData.access_token,
+    })
+    const llRes = await fetch(`https://graph.instagram.com/access_token?${llParams.toString()}`)
     const llData = await llRes.json()
     if (!llData.access_token) {
       throw new Error(`Long-lived token exchange failed: ${JSON.stringify(llData)}`)

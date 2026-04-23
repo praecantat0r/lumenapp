@@ -270,7 +270,7 @@ function renderRect(obj: CanvasObject, baseStyle: string, scale = 1): string {
 }
 
 function renderText(obj: CanvasObject, scale = 1): string {
-  const text       = (obj.text || '').replace(/\n/g, '<br>')
+  const text       = escapeHtml(obj.text || '').replace(/\n/g, '<br>')
   const fontSize   = (obj.fontSize ?? 32) * scale
   const scaleX     = obj.scaleX ?? 1
   const w          = (obj.width  ?? 900) * scaleX * scale
@@ -313,6 +313,15 @@ function buildShadow(shadow: CanvasObject['shadow'], isText: boolean, scale = 1)
   const offsetY = (shadow.offsetY ?? 0) * scale
   const prop = isText ? 'text-shadow' : 'box-shadow'
   return `${prop}: ${offsetX}px ${offsetY}px ${blur}px ${color};`
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
 }
 
 function escapeAttr(str: string): string {

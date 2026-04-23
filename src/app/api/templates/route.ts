@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+
+const TemplateCreateSchema = z.object({
+  name:              z.string().min(1).max(200),
+  canvas_json:       z.record(z.unknown()),
+  width:             z.number().int().min(100).max(5000).optional(),
+  height:            z.number().int().min(100).max(5000).optional(),
+  thumbnail_url:     z.string().url().optional(),
+  description:       z.string().max(1000).optional(),
+  category:          z.string().max(100).optional(),
+  use_for_generation: z.boolean().optional(),
+})
 
 export async function GET() {
   const supabase = await createClient()
@@ -24,11 +36,16 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const serviceClient = createServiceClient()
   const body = await req.json()
+  const parsed = TemplateCreateSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues }, { status: 400 })
+  }
+
+  const serviceClient = createServiceClient()
   const { data, error } = await serviceClient
     .from('templates')
-    .insert({ ...body, user_id: user.id })
+    .insert({ ...parsed.data, user_id: user.id, is_user_template: true, is_active: true })
     .select()
     .single()
 

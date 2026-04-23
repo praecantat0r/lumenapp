@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { renderPostServer } from '@/lib/renderer'
+
+const TemplatePatchSchema = z.object({
+  name:               z.string().min(1).max(200).optional(),
+  canvas_json:        z.record(z.unknown()).optional(),
+  width:              z.number().int().min(100).max(5000).optional(),
+  height:             z.number().int().min(100).max(5000).optional(),
+  thumbnail_url:      z.string().url().optional(),
+  description:        z.string().max(1000).optional(),
+  category:           z.string().max(100).optional(),
+  use_for_generation: z.boolean().optional(),
+})
 
 export const maxDuration = 60
 
@@ -30,11 +42,16 @@ export async function PATCH(
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
   const body = await req.json()
+  const parsed = TemplatePatchSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues }, { status: 400 })
+  }
+
+  const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('templates')
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('user_id', user.id)
     .select()
@@ -48,7 +65,7 @@ export async function PATCH(
   // If canvas_json changed, re-render all linked posts and update thumbnail.
   // Render uses the template directly (canvas_overrides: {}) — the template IS
   // the source of truth so no extra overrides are needed.
-  if (body.canvas_json) {
+  if (parsed.data.canvas_json) {
     let thumbnail_url: string | null = null
 
     // Re-render all editable linked posts (pending_review or approved)
@@ -63,7 +80,7 @@ export async function PATCH(
         const { render_url } = await renderPostServer({ template_id: id, canvas_overrides: {} })
         // Derive canvas_overrides from the new template objects so they stay in sync
         const canvas_overrides: Record<string, Record<string, unknown>> = {}
-        for (const obj of body.canvas_json.objects ?? []) {
+        for (const obj of (parsed.data.canvas_json as { objects?: Array<{ lumenId?: string }> }).objects ?? []) {
           if (obj.lumenId) canvas_overrides[obj.lumenId] = obj
         }
         await supabase.from('posts').update({ render_url, canvas_overrides }).eq('id', post.id)
