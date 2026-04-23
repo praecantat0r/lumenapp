@@ -107,7 +107,12 @@ export default async function OverviewPage() {
           .ov-topbar-actions {
             width: 100%; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
           }
-          .ov-search-wrap { flex: 1; min-width: 120px; }
+          .ov-search-wrap { flex: 1; min-width: 120px; order: 1; }
+          .ov-generate-wrap { order: 2; flex-shrink: 0; }
+          .ov-view-all-posts {
+            order: 3; font-size: 10px !important; padding: 3px 10px !important;
+            opacity: 0.75;
+          }
         }
         @media (max-width: 480px) {
           .ov-main { padding: 8px 8px 24px !important; }
@@ -129,8 +134,8 @@ export default async function OverviewPage() {
           <div className="ov-search-wrap">
             <OverviewSearch />
           </div>
-          <a href="/dashboard/posts" className="ov-ghost-btn">View all posts</a>
-          <OverviewGenerateButton />
+          <div className="ov-generate-wrap"><OverviewGenerateButton /></div>
+          <a href="/dashboard/posts" className="ov-ghost-btn ov-view-all-posts">View all posts</a>
         </div>
       </div>
 
