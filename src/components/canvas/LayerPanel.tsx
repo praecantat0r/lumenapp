@@ -4,7 +4,7 @@ export interface LiveLayer {
   lumenId: string
   type: string
 }
-
+//logosss
 interface LayerPanelProps {
   layers: LiveLayer[]        // top-to-bottom visual order (index 0 = front)
   selectedLumenId?: string
