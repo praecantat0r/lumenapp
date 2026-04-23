@@ -45,6 +45,20 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
 
   const filter = initialFilter as Filter
 
+  const MOBILE_PAGE_SIZE = 5
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobilePage, setMobilePage] = useState(1)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => { setMobilePage(1) }, [filter, query, page])
+
   function navigate(f: Filter, p = 1) {
     const params = new URLSearchParams()
     if (f !== 'all') params.set('filter', f)
@@ -304,62 +318,90 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
       </div>
 
       {/* ── Grid ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px 48px', background: 'var(--carbon)' }}>
-        {filtered.length > 0 ? (
-          <div className="pt-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
-            {filtered.map(post => <PostCard key={post.id} post={post} onClick={() => openDetail(post)} />)}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px', textAlign: 'center' }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(182,141,64,0.08)', border: '1px solid rgba(182,141,64,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--candle)', opacity: 0.5 }}>search_off</span>
-            </div>
-            <div style={{ fontFamily: 'var(--font-syne)', fontSize: 18, fontWeight: 700, color: 'var(--sand)', marginBottom: 8 }}>No posts found</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 280 }}>Try adjusting your filters or generate a new post.</div>
-          </div>
-        )}
+      <div className="pt-content" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px 48px', background: 'var(--carbon)' }}>
+        {(() => {
+          const mobileTotalPages = Math.max(1, Math.ceil(filtered.length / MOBILE_PAGE_SIZE))
+          const visiblePosts = isMobile
+            ? filtered.slice((mobilePage - 1) * MOBILE_PAGE_SIZE, mobilePage * MOBILE_PAGE_SIZE)
+            : filtered
+          const mobileHasPrev = mobilePage > 1 || page > 1
+          const mobileHasNext = mobilePage < mobileTotalPages || page < totalPages
 
-        {/* ── Pagination ── */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 40 }}>
-            <button
-              className="pt-page-btn"
-              disabled={page <= 1}
-              onClick={() => navigate(filter, page - 1)}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
-                acc.push(p)
-                return acc
-              }, [])
-              .map((p, i) =>
-                p === 'ellipsis' ? (
-                  <span key={`e${i}`} style={{ color: 'var(--muted)', fontSize: 13, padding: '0 4px' }}>…</span>
-                ) : (
-                  <button
-                    key={p}
-                    className={`pt-page-btn${p === page ? ' pt-page-active' : ''}`}
-                    onClick={() => navigate(filter, p as number)}
-                  >
-                    {p}
-                  </button>
-                )
+          return (
+            <>
+              {visiblePosts.length > 0 ? (
+                <div className="pt-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
+                  {visiblePosts.map(post => <PostCard key={post.id} post={post} onClick={() => openDetail(post)} />)}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px', textAlign: 'center' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(182,141,64,0.08)', border: '1px solid rgba(182,141,64,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--candle)', opacity: 0.5 }}>search_off</span>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-syne)', fontSize: 18, fontWeight: 700, color: 'var(--sand)', marginBottom: 8 }}>No posts found</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 280 }}>Try adjusting your filters or generate a new post.</div>
+                </div>
               )}
 
-            <button
-              className="pt-page-btn"
-              disabled={page >= totalPages}
-              onClick={() => navigate(filter, page + 1)}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
-            </button>
-          </div>
-        )}
+              {/* ── Mobile pagination ── */}
+              {isMobile && (mobileHasPrev || mobileHasNext) && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, padding: '0 4px' }}>
+                  <button
+                    className="pt-page-btn"
+                    disabled={!mobileHasPrev}
+                    onClick={() => {
+                      if (mobilePage > 1) setMobilePage(p => p - 1)
+                      else navigate(filter, page - 1)
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+                  </button>
+                  <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>
+                    {(mobilePage - 1) * MOBILE_PAGE_SIZE + 1}–{Math.min(mobilePage * MOBILE_PAGE_SIZE, filtered.length)} of {filtered.length}{page < totalPages ? '+' : ''}
+                  </span>
+                  <button
+                    className="pt-page-btn"
+                    disabled={!mobileHasNext}
+                    onClick={() => {
+                      if (mobilePage < mobileTotalPages) setMobilePage(p => p + 1)
+                      else navigate(filter, page + 1)
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
+                  </button>
+                </div>
+              )}
+
+              {/* ── Desktop pagination ── */}
+              {!isMobile && totalPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 40 }}>
+                  <button className="pt-page-btn" disabled={page <= 1} onClick={() => navigate(filter, page - 1)}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                    .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
+                      acc.push(p)
+                      return acc
+                    }, [])
+                    .map((p, i) =>
+                      p === 'ellipsis' ? (
+                        <span key={`e${i}`} style={{ color: 'var(--muted)', fontSize: 13, padding: '0 4px' }}>…</span>
+                      ) : (
+                        <button key={p} className={`pt-page-btn${p === page ? ' pt-page-active' : ''}`} onClick={() => navigate(filter, p as number)}>
+                          {p}
+                        </button>
+                      )
+                    )}
+                  <button className="pt-page-btn" disabled={page >= totalPages} onClick={() => navigate(filter, page + 1)}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
+                  </button>
+                </div>
+              )}
+            </>
+          )
+        })()}
       </div>
 
       {/* ── Detail backdrop ── */}
