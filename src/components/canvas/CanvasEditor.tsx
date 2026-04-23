@@ -117,6 +117,16 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   const [rightPanelMinimized, setRightPanelMinimized] = useState(typeof window !== 'undefined' ? window.innerWidth <= 767 : false)
   const [layers, setLayers]             = useState<LiveLayer[]>([])
 
+  const openLeftPanel = useCallback(() => {
+    setLeftSidebarOpen(true)
+    if (typeof window !== 'undefined' && window.innerWidth <= 767) setRightPanelMinimized(true)
+  }, [])
+
+  const openRightPanel = useCallback(() => {
+    setRightPanelMinimized(false)
+    if (typeof window !== 'undefined' && window.innerWidth <= 767) setLeftSidebarOpen(false)
+  }, [])
+
   // Text properties
   const [textAlign, setTextAlign]   = useState<string>('left')
   const [fontFamily, setFontFamily] = useState<string>('IBM Plex Sans')
@@ -2543,7 +2553,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                     icon: 'palette', label: 'Colors', active: false,
                     action: () => {
                       if (!selectedObj) return
-                      setLeftSidebarOpen(true)
+                      openLeftPanel()
                       if (colorPickerRef.current) {
                         const cur = isText(selType) ? textColor : fillColor
                         colorPickerRef.current.value = cur.startsWith('#') ? cur : '#b68d40'
@@ -2553,7 +2563,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                   },
                   {
                     icon: 'text_fields', label: 'Type', active: false,
-                    action: () => { setActiveLeftTab('text'); setLeftSidebarOpen(true) },
+                    action: () => { setActiveLeftTab('text'); openLeftPanel() },
                   },
                   {
                     icon: 'filter_b_and_w', label: 'Effects', active: showEffects,
@@ -2571,7 +2581,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                         }
                       }
                       setShowEffects(v => !v)
-                      setRightPanelMinimized(false)
+                      openRightPanel()
                     },
                   },
                 ]).map(({ icon, label, active, action }) => (
@@ -2616,7 +2626,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
         {!isPreview && (
           <button
             className={`ce-left-toggle${leftSidebarOpen ? ' open' : ''}`}
-            onClick={() => setLeftSidebarOpen(v => !v)}
+            onClick={() => leftSidebarOpen ? setLeftSidebarOpen(false) : openLeftPanel()}
             style={{
               position: 'absolute',
               top: '50%',
@@ -2645,7 +2655,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
         {/* ─── RIGHT PANEL TOGGLE TAB ───────────────────────────────────────────── */}
         {selectedObj && !isPreview && (
           <button
-            onClick={() => setRightPanelMinimized(v => !v)}
+            onClick={() => rightPanelMinimized ? openRightPanel() : setRightPanelMinimized(true)}
             style={{
               position: 'absolute',
               right: rightPanelMinimized ? 0 : 272,
