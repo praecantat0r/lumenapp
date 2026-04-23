@@ -9,6 +9,7 @@ export default async function OverviewPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
+  //picus
 
   const now        = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
