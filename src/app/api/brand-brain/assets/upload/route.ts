@@ -52,8 +52,25 @@ Reply with one of: product_photo, place_photo, label, logo, photo, other`,
   }
 }
 
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const MAX_SIZE = 15 * 1024 * 1024
+
+function mimeToExt(mime: string): string {
+  return mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1]
+}
+
+function hasValidMagicBytes(bytes: Uint8Array, mime: string): boolean {
+  switch (mime) {
+    case 'image/jpeg': return bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF
+    case 'image/png':  return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47
+    case 'image/webp': return bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+                           && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+    case 'image/gif':  return bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38
+    default: return false
+  }
+}
+
 export async function POST(req: NextRequest) {
-  // Auth check via session cookie
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -62,20 +79,29 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
+  if (file.size > MAX_SIZE)
+    return NextResponse.json({ error: 'File too large' }, { status: 413 })
+
+  const mime = file.type.toLowerCase()
+  if (!ALLOWED_MIME.has(mime))
+    return NextResponse.json({ error: 'Invalid file type' }, { status: 415 })
+
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  if (!hasValidMagicBytes(bytes, mime))
+    return NextResponse.json({ error: 'Invalid file content' }, { status: 415 })
+
   const service = getServiceClient()
 
   // Create bucket if needed (no-op if exists), then ensure it's public
   await service.storage.createBucket('brand-assets', { public: true })
   await service.storage.updateBucket('brand-assets', { public: true })
 
-  const ext  = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `${user.id}/${Date.now()}.${ext}`
-  const bytes = new Uint8Array(await file.arrayBuffer())
+  const path = `${user.id}/${crypto.randomUUID()}.${mimeToExt(mime)}`
 
   // Upload and classify in parallel
   const [uploadResult, category] = await Promise.all([
-    service.storage.from('brand-assets').upload(path, bytes, { contentType: file.type, upsert: true }),
-    classifyAsset(bytes, file.type as 'image/jpeg' | 'image/png' | 'image/webp'),
+    service.storage.from('brand-assets').upload(path, bytes, { contentType: mime, upsert: true }),
+    classifyAsset(bytes, mime as 'image/jpeg' | 'image/png' | 'image/webp'),
   ])
 
   if (uploadResult.error) return NextResponse.json({ error: uploadResult.error.message }, { status: 500 })

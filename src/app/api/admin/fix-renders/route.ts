@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { renderPostServer, SEED_CANVAS_JSON } from '@/lib/renderer'
 
@@ -7,6 +8,12 @@ export const maxDuration = 60
 // Re-renders all pending_review posts using SEED coordinates (fixes coordinate corruption).
 // Also resets the linked per-post template's canvas_json and thumbnail.
 export async function POST() {
+  const supabaseAuth = await createClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+  if (!user || user.email !== process.env.ADMIN_EMAIL) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const supabase = createServiceClient()
 
   const { data: posts, error } = await supabase

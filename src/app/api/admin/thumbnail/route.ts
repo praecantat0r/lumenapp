@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { renderPostServer } from '@/lib/renderer'
 
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
+  const supabaseAuth = await createClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+  if (!user || user.email !== process.env.ADMIN_EMAIL) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const { template_id } = await req.json()
   if (!template_id) return NextResponse.json({ error: 'template_id required' }, { status: 400 })
 

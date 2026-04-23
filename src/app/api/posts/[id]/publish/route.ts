@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { publishToInstagram } from '@/lib/instagram'
 import { indexPostAsExample } from '@/lib/context-builder'
+import { decryptToken } from '@/lib/crypto'
 import type { BrandBrain, Post } from '@/types'
 
 export async function POST(
@@ -34,7 +35,7 @@ export async function POST(
     const caption = [post.caption, post.hashtags].filter(Boolean).join('\n\n')
     const { instagram_post_id, permalink } = await publishToInstagram(
       igConn.instagram_user_id,
-      igConn.access_token,
+      decryptToken(igConn.access_token),
       post.render_url,
       caption
     )

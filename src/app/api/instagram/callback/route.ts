@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { encryptToken } from '@/lib/crypto'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
       user_id: userId,
       instagram_user_id: igUserId,
       username: igData.username,
-      access_token: longLivedToken,
+      access_token: encryptToken(longLivedToken),
       token_expires_at: expiresAt,
     }, { onConflict: 'user_id' })
 

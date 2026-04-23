@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { decryptToken } from '@/lib/crypto'
 
 const IG_BASE = 'https://graph.instagram.com/v18.0'
 
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest) {
   const until = Math.floor(Date.now() / 1000)
   const since = until - periodDays * 24 * 60 * 60
 
-  const { instagram_user_id: igUserId, access_token: accessToken } = igConn
+  const { instagram_user_id: igUserId } = igConn
+  const accessToken = decryptToken(igConn.access_token)
 
   try {
     // Parallel fetches: daily insights, profile (followers_count field), lifetime follower metric, media
