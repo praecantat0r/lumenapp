@@ -114,7 +114,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   const [canvasScale, setCanvasScale]   = useState(1)
   const [activeLeftTab, setActiveLeftTab] = useState<LeftTab>('canvas')
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 767 : true)
-  const [rightPanelMinimized, setRightPanelMinimized] = useState(false)
+  const [rightPanelMinimized, setRightPanelMinimized] = useState(typeof window !== 'undefined' ? window.innerWidth <= 767 : false)
   const [layers, setLayers]             = useState<LiveLayer[]>([])
 
   // Text properties
@@ -420,6 +420,126 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       container.removeEventListener('touchmove',   onTouchMove)
       container.removeEventListener('touchend',    onTouchEnd)
       container.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [])
+
+  // ── Pinch-to-zoom canvas (mobile, fires when no object is selected) ──────────
+  useEffect(() => {
+    const container = canvasAreaRef.current
+    if (!container) return
+
+    let isZooming    = false
+    let zoomInitDist = 0
+    let zoomInitScale = 1
+    let latestRatio  = 1
+    let latestMidX   = 0
+    let latestMidY   = 0
+    let rafId: number | null = null
+
+    function dist(touches: TouchList) {
+      const dx = touches[0].clientX - touches[1].clientX
+      const dy = touches[0].clientY - touches[1].clientY
+      return Math.hypot(dx, dy)
+    }
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return
+      const obj = fabricRef.current?.getActiveObject()
+      if (obj) return  // object selected → existing pinch-resize handler owns this gesture
+      isZooming     = true
+      zoomInitDist  = dist(e.touches)
+      zoomInitScale = canvasScaleRef.current
+      latestRatio   = 1
+      e.preventDefault()
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isZooming || e.touches.length !== 2) return
+      e.preventDefault()
+      latestRatio = dist(e.touches) / zoomInitDist
+      latestMidX  = (e.touches[0].clientX + e.touches[1].clientX) / 2
+      latestMidY  = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const outer = canvasOuterRef.current
+        const inner = canvasInnerRef.current
+        if (!outer || !inner) return
+        const oldScale = canvasScaleRef.current
+        const newScale = Math.max(0.1, Math.min(2, zoomInitScale * latestRatio))
+        if (newScale === oldScale) return
+        const oRect = outer.getBoundingClientRect()
+        const fx = (latestMidX - oRect.left) / oldScale
+        const fy = (latestMidY - oRect.top)  / oldScale
+        outer.style.width     = `${DISPLAY_WIDTH  * newScale}px`
+        outer.style.height    = `${DISPLAY_HEIGHT * newScale}px`
+        inner.style.transform = `scale(${newScale})`
+        const newRect = outer.getBoundingClientRect()
+        container.scrollLeft += (newRect.left + fx * newScale) - latestMidX
+        container.scrollTop  += (newRect.top  + fy * newScale) - latestMidY
+        canvasScaleRef.current = newScale
+        setCanvasScale(newScale)
+        manualZoom.current = true
+      })
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isZooming) return
+      if (e.touches.length < 2) {
+        isZooming = false
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      }
+    }
+
+    container.addEventListener('touchstart',  onTouchStart, { passive: false })
+    container.addEventListener('touchmove',   onTouchMove,  { passive: false })
+    container.addEventListener('touchend',    onTouchEnd)
+    container.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      container.removeEventListener('touchstart',  onTouchStart)
+      container.removeEventListener('touchmove',   onTouchMove)
+      container.removeEventListener('touchend',    onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [])
+
+  // ── Tap outside the post → deselect (mobile) ────────────────────────────────
+  useEffect(() => {
+    const container = canvasAreaRef.current
+    if (!container) return
+
+    let startX = 0, startY = 0
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length !== 1) return
+      const t = e.changedTouches[0]
+      if (Math.hypot(t.clientX - startX, t.clientY - startY) > 10) return // drag, not tap
+
+      const outer = canvasOuterRef.current
+      const fc    = fabricRef.current
+      if (!outer || !fc || !fc.getActiveObject()) return
+
+      const rect   = outer.getBoundingClientRect()
+      const onPost = t.clientX >= rect.left && t.clientX <= rect.right &&
+                     t.clientY >= rect.top  && t.clientY <= rect.bottom
+      if (!onPost) {
+        fc.discardActiveObject()
+        fc.renderAll()
+      }
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchend',   onTouchEnd)
     }
   }, [])
 
@@ -988,11 +1108,12 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       if (!mounted || !canvasRef.current) return
       if (canvasRef.current.hasAttribute('data-fabric')) return
 
+      const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
       canvas = new Canvas(canvasRef.current, {
         width:  DISPLAY_WIDTH,
         height: DISPLAY_HEIGHT,
         enableRetinaScaling: false,
-        selection: true,
+        selection: !isTouchDevice,
         preserveObjectStacking: true,
       })
       canvas.backgroundColor = resolveCSSVar(templateJson?.background ?? 'var(--carbon)')
@@ -1030,6 +1151,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       canvas.on('selection:created', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
       canvas.on('selection:updated', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
       canvas.on('selection:cleared', () => setSelectedObj(null))
+
       canvas.on('object:added',    () => { refreshLayers(); pushUndo() })
       canvas.on('object:removed',  () => { refreshLayers(); pushUndo() })
       canvas.on('object:modified', (e: any) => {
@@ -1752,8 +1874,10 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--carbon)', overflow: 'hidden', fontFamily: 'var(--font-ibm)' }}>
       <style>{`
         .ce-mobile-hint { display: none; }
+        .ce-left-toggle { left: 0; transition: left 0.38s cubic-bezier(0.4,0,0.2,1), color 0.15s; }
         @media (max-width: 767px) {
           .ce-left-aside  { position: absolute !important; top: 0 !important; left: 0 !important; height: 100% !important; z-index: 50 !important; }
+          .ce-left-toggle.open { left: 220px; }
           .ce-mobile-hint { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; background: rgba(182,141,64,0.08); border-bottom: 1px solid rgba(182,141,64,0.15); font-family: var(--font-ibm); font-size: 11px; color: var(--sand); flex-shrink: 0; }
           .ce-topbar-logo { display: none; }
           .ce-topbar-tabs { margin-left: 0 !important; }
@@ -2419,6 +2543,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                     icon: 'palette', label: 'Colors', active: false,
                     action: () => {
                       if (!selectedObj) return
+                      setLeftSidebarOpen(true)
                       if (colorPickerRef.current) {
                         const cur = isText(selType) ? textColor : fillColor
                         colorPickerRef.current.value = cur.startsWith('#') ? cur : '#b68d40'
@@ -2428,7 +2553,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                   },
                   {
                     icon: 'text_fields', label: 'Type', active: false,
-                    action: () => { setActiveLeftTab('text') },
+                    action: () => { setActiveLeftTab('text'); setLeftSidebarOpen(true) },
                   },
                   {
                     icon: 'filter_b_and_w', label: 'Effects', active: showEffects,
@@ -2446,6 +2571,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                         }
                       }
                       setShowEffects(v => !v)
+                      setRightPanelMinimized(false)
                     },
                   },
                 ]).map(({ icon, label, active, action }) => (
@@ -2486,6 +2612,36 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
               </div>
             )}
           </div>
+        {/* ─── LEFT SIDEBAR TOGGLE TAB ─────────────────────────────────────────── */}
+        {!isPreview && (
+          <button
+            className={`ce-left-toggle${leftSidebarOpen ? ' open' : ''}`}
+            onClick={() => setLeftSidebarOpen(v => !v)}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 51,
+              width: 20, height: 44,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderLeft: 'none',
+              borderRadius: '0 6px 6px 0',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--muted)',
+              padding: 0,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--parchment)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
+            title={leftSidebarOpen ? 'Close panel' : 'Open panel'}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+              {leftSidebarOpen ? 'chevron_left' : 'chevron_right'}
+            </span>
+          </button>
+        )}
+
         {/* ─── RIGHT PANEL TOGGLE TAB ───────────────────────────────────────────── */}
         {selectedObj && !isPreview && (
           <button
