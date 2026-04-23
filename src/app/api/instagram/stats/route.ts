@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const IG_BASE = 'https://graph.instagram.com/v18.0'
+const IG_BASE = 'https://graph.instagram.com/v21.0'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -34,6 +34,11 @@ export async function GET(req: NextRequest) {
     const [reachImpData, profileData, follMetricData, mediaData] = await Promise.all([
       reachImpRes.json(), profileRes.json(), follMetricRes.json(), mediaRes.json()
     ])
+
+    if (reachImpData.error) console.warn('IG stats reach/imp error:', JSON.stringify(reachImpData.error))
+    if (profileData.error)  console.warn('IG stats profile error:',   JSON.stringify(profileData.error))
+    if (follMetricData.error) console.warn('IG stats follower error:', JSON.stringify(follMetricData.error))
+    if (mediaData.error)    console.warn('IG stats media error:',     JSON.stringify(mediaData.error))
 
     // Resolve follower count: try profile field first, fall back to lifetime metric
     const followerFromProfile: number = profileData.followers_count ?? 0

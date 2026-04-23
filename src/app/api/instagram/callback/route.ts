@@ -36,13 +36,15 @@ export async function GET(req: NextRequest) {
     const igUserId = tokenData.user_id?.toString()
     if (!igUserId) throw new Error(`No user_id in token response: ${JSON.stringify(tokenData)}`)
 
-    // Exchange for long-lived token
+    // Exchange for long-lived token (60 days)
     const llRes = await fetch(
       `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${process.env.INSTAGRAM_APP_SECRET}&access_token=${tokenData.access_token}`
     )
     const llData = await llRes.json()
-    const longLivedToken = llData.access_token || tokenData.access_token
-
+    if (!llData.access_token) {
+      throw new Error(`Long-lived token exchange failed: ${JSON.stringify(llData)}`)
+    }
+    const longLivedToken = llData.access_token
     // Get Instagram username — try /me first, fall back to /{id}
     let username: string | undefined
     for (const url of [
@@ -55,9 +57,8 @@ export async function GET(req: NextRequest) {
       console.warn('IG profile fetch:', JSON.stringify(d))
     }
 
-    console.log('IG callback — igUserId:', igUserId, '| username:', username, '| longLivedToken ok:', !!llData.access_token)
-
-    const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+    const expiresInSeconds: number = llData.expires_in ?? (60 * 24 * 60 * 60)
+    const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString()
 
     await supabase.from('instagram_connections').upsert({
       user_id: userId,
