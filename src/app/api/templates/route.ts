@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 const TemplateCreateSchema = z.object({
   name:              z.string().min(1).max(200),
-  canvas_json:       z.record(z.unknown()),
+  canvas_json:       z.record(z.string(), z.unknown()),
   width:             z.number().int().min(100).max(5000).optional(),
   height:            z.number().int().min(100).max(5000).optional(),
   thumbnail_url:     z.string().url().optional(),
