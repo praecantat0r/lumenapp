@@ -1,10 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/render': ['./node_modules/@sparticuz/chromium/**/*'],
-    },
+  outputFileTracingIncludes: {
+    '/api/render': ['./node_modules/@sparticuz/chromium/**/*'],
   },
   images: {
     remotePatterns: [
