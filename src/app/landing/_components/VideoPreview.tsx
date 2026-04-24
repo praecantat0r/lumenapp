@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useT } from './LangContext'
 import { useBreakpoint } from './useBreakpoint'
 
@@ -7,6 +7,12 @@ export function VideoPreview() {
   const { t, lang } = useT()
   const { isMobile } = useBreakpoint()
   const [playing, setPlaying] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  function handlePlay() {
+    setPlaying(true)
+    videoRef.current?.play()
+  }
 
   return (
     <section style={{ padding: isMobile ? '0 20px 72px' : '0 32px 120px' }}>
@@ -14,12 +20,23 @@ export function VideoPreview() {
         <div style={{
           position: 'relative', aspectRatio: '16/9', borderRadius: isMobile ? 12 : 16, overflow: 'hidden',
           border: '1px solid var(--border)',
-          background: 'linear-gradient(135deg, #1c1510 0%, #0e0e0d 65%), radial-gradient(circle at 30% 40%, rgba(212,168,75,0.25), transparent 55%)',
+          background: '#0e0e0d',
           boxShadow: '0 50px 140px -30px rgba(0,0,0,0.7)',
-          cursor: 'pointer',
-        }} onClick={() => setPlaying(true)}>
-          {!playing ? (
-            <>
+        }}>
+          <video
+            ref={videoRef}
+            src={lang === 'sk' ? '/PromoSnappy.mp4' : '/PromoSnappyEN.mp4'}
+            controls
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+          {!playing && (
+            <div
+              onClick={handlePlay}
+              style={{
+                position: 'absolute', inset: 0, cursor: 'pointer',
+                background: 'linear-gradient(135deg, #1c1510 0%, #0e0e0d 65%), radial-gradient(circle at 30% 40%, rgba(212,168,75,0.25), transparent 55%)',
+              }}
+            >
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(14,14,13,0) 0%, rgba(14,14,13,0.5) 100%)' }}/>
               <div style={{
                 position: 'absolute', top: '50%', left: '50%',
@@ -49,15 +66,7 @@ export function VideoPreview() {
                 <span>{t.video.tagLeft}</span>
                 <span>{t.video.tagRight}</span>
               </div>
-            </>
-          ) : (
-            <video
-              src={lang === 'sk' ? '/PromoSnappy.mp4' : '/PromoSnappyEN.mp4'}
-              autoPlay
-              muted
-              controls
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+            </div>
           )}
         </div>
       </div>
