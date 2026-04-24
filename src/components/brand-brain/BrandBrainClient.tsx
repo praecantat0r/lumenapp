@@ -3,18 +3,20 @@ import { useState, useRef, useEffect } from 'react'
 import { AssetUploader } from './AssetUploader'
 import type { BrandBrain, BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
+import { useLanguage } from '@/lib/i18n/context'
+import { LANGUAGES, type LangCode } from '@/lib/i18n/translations'
 
-const TONE_OPTIONS = [
+const TONE_KEYS = [
   'Professional', 'Friendly', 'Inspiring', 'Authoritative', 'Playful',
   'Luxurious', 'Minimal', 'Bold', 'Warm', 'Humorous', 'Informative', 'Passionate',
 ]
 
-const SECTIONS = [
-  { id: 'identity', num: '01', label: 'Identity'     },
-  { id: 'voice',    num: '02', label: 'Voice & Tone' },
-  { id: 'content',  num: '03', label: 'Content'      },
-  { id: 'schedule', num: '04', label: 'Schedule'     },
-  { id: 'assets',   num: '05', label: 'Assets'       },
+const SECTION_IDS = [
+  { id: 'identity', num: '01', labelKey: 'brandBrain.sectionIdentity' },
+  { id: 'voice',    num: '02', labelKey: 'brandBrain.sectionVoice'    },
+  { id: 'content',  num: '03', labelKey: 'brandBrain.sectionContent'  },
+  { id: 'schedule', num: '04', labelKey: 'brandBrain.sectionSchedule' },
+  { id: 'assets',   num: '05', labelKey: 'brandBrain.sectionAssets'   },
 ]
 
 interface Props {
@@ -57,7 +59,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-function SectionHeader({ num, title, done }: { num: string; title: string; done: boolean }) {
+function SectionHeader({ num, title, done, completeLabel }: { num: string; title: string; done: boolean; completeLabel: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
       <div style={{
@@ -78,7 +80,7 @@ function SectionHeader({ num, title, done }: { num: string; title: string; done:
           marginLeft: 'auto', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
           padding: '4px 12px', borderRadius: 9999, background: 'rgba(182,141,64,0.1)',
           color: 'var(--candle)', fontWeight: 700, border: '1px solid rgba(182,141,64,0.2)',
-        }}>Complete</div>
+        }}>{completeLabel}</div>
       )}
     </div>
   )
@@ -89,23 +91,26 @@ function parseTopicsPercent(value: string): number {
   return m ? Math.min(100, Math.max(0, parseInt(m[1]))) : 60
 }
 
-function ContentRatioSlider({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ContentRatioSlider({ value, onChange, topicsLabel, servicesLabel, exampleText }: {
+  value: string; onChange: (v: string) => void
+  topicsLabel: string; servicesLabel: string; exampleText: string
+}) {
   const topics = parseTopicsPercent(value)
   const products = 100 - topics
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const t = parseInt(e.target.value)
-    onChange(`${t}% topics, ${100 - t}% services`)
+    const v = parseInt(e.target.value)
+    onChange(`${v}% topics, ${100 - v}% services`)
   }
 
   return (
     <div style={{ paddingTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontSize: 12, fontFamily: 'var(--font-ibm)', color: '#D4A84B', fontWeight: 400 }}>
-          {topics}% Topics
+          {topics}% {topicsLabel}
         </span>
         <span style={{ fontSize: 12, fontFamily: 'var(--font-ibm)', color: 'var(--muted)', fontWeight: 300 }}>
-          {products}% Services
+          {products}% {servicesLabel}
         </span>
       </div>
       <div style={{ position: 'relative', height: 4, borderRadius: 2, background: 'var(--border)', marginBottom: 8 }}>
@@ -124,7 +129,7 @@ function ContentRatioSlider({ value, onChange }: { value: string; onChange: (v: 
         style={{ width: '100%', accentColor: '#D4A84B', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
       />
       <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginTop: 4 }}>
-        e.g. 60% topics = 6 out of every 10 posts cover a content topic
+        {exampleText}
       </div>
     </div>
   )
@@ -147,13 +152,15 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
   const [igConnection, setIgConnection]   = useState(initialIgConnection)
   const [disconnecting, setDisconnecting] = useState(false)
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
+  const { t, setLanguage } = useLanguage()
+  const SECTIONS = SECTION_IDS.map(s => ({ ...s, label: t(s.labelKey) }))
 
   const score = completeness(form)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('ig_connected') === '1') {
-      toast.success('Instagram connected')
+      toast.success(t('brandBrain.toastIgConnected'))
       // Scroll the schedule section into view so the @handle is visible
       setTimeout(() => {
         sectionRefs.current['schedule']?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -181,26 +188,26 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
       const json = await res.json()
       setSaved(true)
       if (json._warning) {
-        toast.error('⚠️ Promotion fields not saved — missing DB columns. Run SQL migration in Supabase.')
+        toast.error(t('brandBrain.toastMigration'))
       } else {
-        toast.success('Brand Brain updated')
+        toast.success(t('brandBrain.toastUpdated'))
       }
       setTimeout(() => setSaved(false), 2000)
     } else {
-      toast.error('Save failed')
+      toast.error(t('brandBrain.toastSaveFailed'))
     }
   }
 
   async function disconnectInstagram() {
-    if (!confirm('Disconnect Instagram? Auto-publishing will stop.')) return
+    if (!confirm(t('brandBrain.igDisconnectConfirm'))) return
     setDisconnecting(true)
     const res = await fetch('/api/instagram/disconnect', { method: 'POST' })
     setDisconnecting(false)
     if (res.ok) {
       setIgConnection(null)
-      toast.success('Instagram disconnected')
+      toast.success(t('brandBrain.toastIgDisconnected'))
     } else {
-      toast.error('Disconnect failed')
+      toast.error(t('brandBrain.toastDisconnectFailed'))
     }
   }
 
@@ -318,11 +325,11 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
       {/* ── Page header ── */}
       <div className="bb-page-header" style={{ borderBottom: '1px solid rgba(78,69,56,0.25)', padding: '24px 32px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexShrink: 0, background: 'var(--carbon)' }}>
         <div>
-          <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600 }}>Identity &amp; Voice</span>
-          <h1 style={{ fontFamily: 'var(--font-syne)', fontSize: 32, fontWeight: 800, color: 'var(--parchment)', letterSpacing: '-0.03em', lineHeight: 1.1, marginTop: 4 }}>Brand Brain</h1>
+          <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600 }}>{t('brandBrain.headerLabel')}</span>
+          <h1 style={{ fontFamily: 'var(--font-syne)', fontSize: 32, fontWeight: 800, color: 'var(--parchment)', letterSpacing: '-0.03em', lineHeight: 1.1, marginTop: 4 }}>{t('brandBrain.title')}</h1>
         </div>
         <div className="bb-page-header-right" style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600, marginBottom: 6 }}>Configuration Status</div>
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600, marginBottom: 6 }}>{t('brandBrain.configStatus')}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 140, height: 4, background: 'rgba(78,69,56,0.35)', borderRadius: 2, overflow: 'hidden' }}>
               <div style={{ height: '100%', background: score >= 80 ? '#6EBF8B' : 'var(--candle)', width: `${score}%`, borderRadius: 2, transition: 'width 0.4s ease' }} />
@@ -335,7 +342,7 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
       {/* ── Mobile bottom save button ── */}
       <div className="bb-mobile-save">
         <button className={`bb-save-btn${saved ? ' saved' : ''}`} onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Changes'}
+          {saving ? t('brandBrain.saving') : saved ? t('brandBrain.saved') : t('brandBrain.saveChanges')}
         </button>
       </div>
 
@@ -362,10 +369,10 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
             borderRadius: 16, padding: '18px 20px', marginBottom: 16,
           }}>
             <div style={{ fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginBottom: 6 }}>
-              Brand Brain
+              {t('brandBrain.title')}
             </div>
             <div style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 15, color: 'var(--parchment)', letterSpacing: '-0.01em', lineHeight: 1.2, minHeight: 20 }}>
-              {form.brand_name || <span style={{ color: 'rgba(196,185,154,0.25)', fontWeight: 300, fontSize: 13 }}>Unnamed brand</span>}
+              {form.brand_name || <span style={{ color: 'rgba(196,185,154,0.25)', fontWeight: 300, fontSize: 13 }}>{t('brandBrain.unnamedBrand')}</span>}
             </div>
             {form.industry && (
               <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginTop: 3 }}>{form.industry}</div>
@@ -374,7 +381,7 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
             {/* Score bar */}
             <div style={{ marginTop: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>Completeness</span>
+                <span style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>{t('brandBrain.completeness')}</span>
                 <span style={{ fontSize: 11, fontFamily: 'var(--font-syne)', fontWeight: 700, color: score >= 80 ? '#6EBF8B' : score >= 40 ? '#D4A84B' : 'var(--muted)' }}>{score}%</span>
               </div>
               <div style={{ height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
@@ -410,7 +417,7 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
             onClick={save}
             disabled={saving}
           >
-            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Changes'}
+            {saving ? t('brandBrain.saving') : saved ? t('brandBrain.saved') : t('brandBrain.saveChanges')}
           </button>
           </div>
         </div>
@@ -421,40 +428,51 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
           {/* ── 01 Identity ── */}
           <section ref={el => { sectionRefs.current['identity'] = el }} id="identity" style={{ scrollMarginTop: 24 }}>
             <Card>
-              <SectionHeader num="01" title="Identity" done={sectionComplete('identity', form)} />
+              <SectionHeader num="01" title={t('brandBrain.sectionIdentity')} done={sectionComplete('identity', form)} completeLabel={t('brandBrain.complete')} />
 
               <div className="bb-grid">
-                <Field label="Brand name">
-                  <input className="bb-input" value={form.brand_name || ''} onChange={e => update({ brand_name: e.target.value })} placeholder="Your brand name" />
+                <Field label={t('brandBrain.brandName')}>
+                  <input className="bb-input" value={form.brand_name || ''} onChange={e => update({ brand_name: e.target.value })} placeholder={t('brandBrain.brandNamePlaceholder')} />
                 </Field>
-                <Field label="Industry">
-                  <input className="bb-input" value={form.industry || ''} onChange={e => update({ industry: e.target.value })} placeholder="e.g. Fashion, Tech, Food…" />
+                <Field label={t('brandBrain.industry')}>
+                  <input className="bb-input" value={form.industry || ''} onChange={e => update({ industry: e.target.value })} placeholder={t('brandBrain.industryPlaceholder')} />
                 </Field>
-                <Field label="Language">
-                  <input className="bb-input" value={form.language || ''} onChange={e => update({ language: e.target.value })} placeholder="e.g. English, Slovak…" />
+                <Field label={t('brandBrain.language')}>
+                  <select
+                    className="bb-input"
+                    value={form.language || 'en'}
+                    onChange={e => {
+                      const val = e.target.value as LangCode
+                      update({ language: val })
+                      setLanguage(val)
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                  </select>
                 </Field>
-                <Field label="Location">
-                  <input className="bb-input" value={form.location || ''} onChange={e => update({ location: e.target.value })} placeholder="City, Country" />
+                <Field label={t('brandBrain.location')}>
+                  <input className="bb-input" value={form.location || ''} onChange={e => update({ location: e.target.value })} placeholder={t('brandBrain.locationPlaceholder')} />
                 </Field>
               </div>
 
               <div style={{ height: 1, background: 'rgba(78,69,56,0.3)' }} />
 
-              <Field label="Brand description" hint="— used in every AI generation">
-                <textarea className="bb-textarea" rows={4} value={form.brand_description || ''} onChange={e => update({ brand_description: e.target.value })} placeholder="Describe what your brand stands for, its mission, and what makes it unique…" />
+              <Field label={t('brandBrain.brandDesc')} hint={t('brandBrain.brandDescHint')}>
+                <textarea className="bb-textarea" rows={4} value={form.brand_description || ''} onChange={e => update({ brand_description: e.target.value })} placeholder={t('brandBrain.brandDescPlaceholder')} />
               </Field>
-              <Field label="Products & services">
-                <textarea className="bb-textarea" rows={3} value={form.products || ''} onChange={e => update({ products: e.target.value })} placeholder="List your main products or services…" />
+              <Field label={t('brandBrain.products')}>
+                <textarea className="bb-textarea" rows={3} value={form.products || ''} onChange={e => update({ products: e.target.value })} placeholder={t('brandBrain.productsPlaceholder')} />
               </Field>
 
               <div style={{ height: 1, background: 'rgba(78,69,56,0.3)' }} />
 
               <div className="bb-grid">
-                <Field label="Slogans">
-                  <input className="bb-input" value={form.slogans || ''} onChange={e => update({ slogans: e.target.value })} placeholder="Your brand tagline" />
+                <Field label={t('brandBrain.slogans')}>
+                  <input className="bb-input" value={form.slogans || ''} onChange={e => update({ slogans: e.target.value })} placeholder={t('brandBrain.slogansPlaceholder')} />
                 </Field>
-                <Field label="Website">
-                  <input className="bb-input" type="url" value={form.website_url || ''} onChange={e => update({ website_url: e.target.value })} placeholder="https://" />
+                <Field label={t('brandBrain.website')}>
+                  <input className="bb-input" type="url" value={form.website_url || ''} onChange={e => update({ website_url: e.target.value })} placeholder={t('brandBrain.websitePlaceholder')} />
                 </Field>
               </div>
             </Card>
@@ -463,21 +481,21 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
           {/* ── 02 Voice & Tone ── */}
           <section ref={el => { sectionRefs.current['voice'] = el }} id="voice" style={{ scrollMarginTop: 24 }}>
             <Card>
-              <SectionHeader num="02" title="Voice & Tone" done={sectionComplete('voice', form)} />
+              <SectionHeader num="02" title={t('brandBrain.sectionVoice')} done={sectionComplete('voice', form)} completeLabel={t('brandBrain.complete')} />
 
-              <Field label="Tone keywords" hint="— select up to 3">
+              <Field label={t('brandBrain.toneKeywords')} hint={t('brandBrain.toneKeywordsHint')}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                  {TONE_OPTIONS.map(t => {
-                    const sel = (form.tone_keywords || []).includes(t)
+                  {TONE_KEYS.map(key => {
+                    const sel = (form.tone_keywords || []).includes(key)
                     return (
                       <button
-                        key={t}
+                        key={key}
                         className={`bb-tone-chip${sel ? ' active' : ''}`}
                         onClick={() => {
                           const curr = form.tone_keywords || []
-                          update({ tone_keywords: sel ? curr.filter(k => k !== t) : curr.length < 3 ? [...curr, t] : curr })
+                          update({ tone_keywords: sel ? curr.filter(k => k !== key) : curr.length < 3 ? [...curr, key] : curr })
                         }}
-                      >{t}</button>
+                      >{t(`onboarding.tone.${key}`)}</button>
                     )
                   })}
                 </div>
@@ -485,16 +503,16 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
 
               <div style={{ height: 1, background: 'rgba(78,69,56,0.3)' }} />
 
-              <Field label="Brand voice description">
-                <textarea className="bb-textarea" rows={3} value={form.tone_description || ''} onChange={e => update({ tone_description: e.target.value })} placeholder="How does your brand communicate? What feeling should every post evoke?" />
+              <Field label={t('brandBrain.toneVoice')}>
+                <textarea className="bb-textarea" rows={3} value={form.tone_description || ''} onChange={e => update({ tone_description: e.target.value })} placeholder={t('brandBrain.toneVoicePlaceholder')} />
               </Field>
 
               <div className="bb-grid">
-                <Field label="Target audience">
-                  <textarea className="bb-textarea" rows={3} value={form.target_audience || ''} onChange={e => update({ target_audience: e.target.value })} placeholder="Who are your ideal customers?" />
+                <Field label={t('brandBrain.targetAudience')}>
+                  <textarea className="bb-textarea" rows={3} value={form.target_audience || ''} onChange={e => update({ target_audience: e.target.value })} placeholder={t('brandBrain.targetAudiencePlaceholder')} />
                 </Field>
-                <Field label="Audience problem">
-                  <textarea className="bb-textarea" rows={3} value={form.audience_problem || ''} onChange={e => update({ audience_problem: e.target.value })} placeholder="What pain points does your brand solve?" />
+                <Field label={t('brandBrain.audienceProblem')}>
+                  <textarea className="bb-textarea" rows={3} value={form.audience_problem || ''} onChange={e => update({ audience_problem: e.target.value })} placeholder={t('brandBrain.audienceProblemPlaceholder')} />
                 </Field>
               </div>
             </Card>
@@ -503,13 +521,13 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
           {/* ── 03 Content ── */}
           <section ref={el => { sectionRefs.current['content'] = el }} id="content" style={{ scrollMarginTop: 24 }}>
             <Card>
-              <SectionHeader num="03" title="Content" done={sectionComplete('content', form)} />
+              <SectionHeader num="03" title={t('brandBrain.sectionContent')} done={sectionComplete('content', form)} completeLabel={t('brandBrain.complete')} />
 
-              <Field label="Post topics & formats">
-                <textarea className="bb-textarea" rows={4} value={form.post_topics || ''} onChange={e => update({ post_topics: e.target.value })} placeholder="What types of content perform best? Product showcases, behind the scenes, tutorials…" />
+              <Field label={t('brandBrain.postTopics')}>
+                <textarea className="bb-textarea" rows={4} value={form.post_topics || ''} onChange={e => update({ post_topics: e.target.value })} placeholder={t('brandBrain.postTopicsPlaceholder')} />
               </Field>
-              <Field label="What to never publish">
-                <textarea className="bb-textarea" rows={3} value={form.post_avoid || ''} onChange={e => update({ post_avoid: e.target.value })} placeholder="Topics, imagery, or tones that are off-brand or inappropriate…" />
+              <Field label={t('brandBrain.postAvoid')}>
+                <textarea className="bb-textarea" rows={3} value={form.post_avoid || ''} onChange={e => update({ post_avoid: e.target.value })} placeholder={t('brandBrain.postAvoidPlaceholder')} />
               </Field>
 
               <div
@@ -540,10 +558,10 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
                 </div>
                 <div>
                   <div style={{ fontSize: 13, color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', fontWeight: 400 }}>
-                    Include people in generated images
+                    {t('brandBrain.includePeople')}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', fontWeight: 300, marginTop: 2 }}>
-                    When off, AI generates clean product or scene shots without people
+                    {t('brandBrain.includePeopleHint')}
                   </div>
                 </div>
               </div>
@@ -551,14 +569,17 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
               <div style={{ height: 1, background: 'rgba(78,69,56,0.3)' }} />
 
               <div className="bb-grid">
-                <Field label="Post type ratio" hint="— topics vs services">
+                <Field label={t('brandBrain.contentRatio')} hint={t('brandBrain.contentRatioHint')}>
                   <ContentRatioSlider
                     value={form.content_ratio || ''}
                     onChange={val => update({ content_ratio: val })}
+                    topicsLabel={t('brandBrain.topicsLabel')}
+                    servicesLabel={t('brandBrain.servicesLabel')}
+                    exampleText={t('brandBrain.contentRatioExample')}
                   />
                 </Field>
-                <Field label="Reference materials">
-                  <input className="bb-input" type="url" value={form.materials_link || ''} onChange={e => update({ materials_link: e.target.value })} placeholder="Link to style guide or brand assets…" />
+                <Field label={t('brandBrain.materials')}>
+                  <input className="bb-input" type="url" value={form.materials_link || ''} onChange={e => update({ materials_link: e.target.value })} placeholder={t('brandBrain.materialsPlaceholder')} />
                 </Field>
               </div>
 
@@ -567,26 +588,26 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
               {/* Promotions */}
               <div>
                 <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginBottom: 4 }}>
-                  Active promotions
+                  {t('brandBrain.activePromotions')}
                 </div>
                 <div style={{ fontSize: 11, color: 'rgba(196,185,154,0.4)', fontFamily: 'var(--font-ibm)', fontWeight: 300, marginBottom: 16, lineHeight: 1.5 }}>
-                  When filled in, the AI will build posts around these. When empty, no discounts or promo language will be invented.
+                  {t('brandBrain.activePromotionsHint')}
                 </div>
                 <div className="bb-grid">
-                  <Field label="Special offer" hint="— optional">
+                  <Field label={t('brandBrain.specialOffer')} hint={t('brandBrain.specialOfferHint')}>
                     <input
                       className="bb-input"
                       value={form.special_offer || ''}
                       onChange={e => update({ special_offer: e.target.value })}
-                      placeholder="e.g. Christmas campaign, Halloween, Back to school…"
+                      placeholder={t('brandBrain.specialOfferPlaceholder')}
                     />
                   </Field>
-                  <Field label="Discount" hint="— optional">
+                  <Field label={t('brandBrain.discount')} hint={t('brandBrain.discountHint')}>
                     <input
                       className="bb-input"
                       value={form.discount || ''}
                       onChange={e => update({ discount: e.target.value })}
-                      placeholder="e.g. 20% off memberships, 2 for 1 on group classes…"
+                      placeholder={t('brandBrain.discountPlaceholder')}
                     />
                   </Field>
                 </div>
@@ -597,14 +618,14 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
           {/* ── 04 Schedule ── */}
           <section ref={el => { sectionRefs.current['schedule'] = el }} id="schedule" style={{ scrollMarginTop: 24 }}>
             <Card>
-              <SectionHeader num="04" title="Schedule" done={sectionComplete('schedule', form)} />
+              <SectionHeader num="04" title={t('brandBrain.sectionSchedule')} done={sectionComplete('schedule', form)} completeLabel={t('brandBrain.complete')} />
 
               <div className="bb-grid">
-                <Field label="Posting frequency">
-                  <input className="bb-input" value={form.posting_frequency || ''} onChange={e => update({ posting_frequency: e.target.value })} placeholder="e.g. Daily, 3× per week…" />
+                <Field label={t('brandBrain.postingFrequency')}>
+                  <input className="bb-input" value={form.posting_frequency || ''} onChange={e => update({ posting_frequency: e.target.value })} placeholder={t('brandBrain.postingFrequencyPlaceholder')} />
                 </Field>
-                <Field label="Preferred posting time">
-                  <input className="bb-input" value={form.posting_time || ''} onChange={e => update({ posting_time: e.target.value })} placeholder="e.g. 9:00 AM CET" />
+                <Field label={t('brandBrain.postingTime')}>
+                  <input className="bb-input" value={form.posting_time || ''} onChange={e => update({ posting_time: e.target.value })} placeholder={t('brandBrain.postingTimePlaceholder')} />
                 </Field>
               </div>
 
@@ -613,7 +634,7 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
               {/* Instagram connection */}
               <div>
                 <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginBottom: 12 }}>
-                  Instagram connection
+                  {t('brandBrain.igConnection')}
                 </div>
                 {igConnection ? (
                   <div style={{
@@ -637,13 +658,13 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
                         @<span style={{ color: '#6EBF8B' }}>{igConnection.username}</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginTop: 2 }}>
-                        Auto-publishing enabled
+                        {t('brandBrain.igAutoPublishing')}
                       </div>
                     </div>
                     <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6EBF8B' }} />
-                        <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6EBF8B', fontFamily: 'var(--font-ibm)' }}>Active</span>
+                        <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6EBF8B', fontFamily: 'var(--font-ibm)' }}>{t('brandBrain.igActive')}</span>
                       </div>
                       <button
                         onClick={disconnectInstagram}
@@ -662,7 +683,7 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
                         onMouseEnter={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(220,80,80,0.35)'; (e.target as HTMLButtonElement).style.color = '#e07070' }}
                         onMouseLeave={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(196,185,154,0.18)'; (e.target as HTMLButtonElement).style.color = 'var(--muted)' }}
                       >
-                        {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                        {disconnecting ? t('brandBrain.igDisconnecting') : t('brandBrain.igDisconnect')}
                       </button>
                     </div>
                   </div>
@@ -683,8 +704,8 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
                       </svg>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', fontWeight: 300 }}>No account connected</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginTop: 2 }}>Connect to enable auto-publishing</div>
+                      <div style={{ fontSize: 13, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', fontWeight: 300 }}>{t('brandBrain.igNotConnected')}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginTop: 2 }}>{t('brandBrain.igConnectPrompt')}</div>
                     </div>
                     <a href="/api/instagram/auth" style={{ textDecoration: 'none' }}>
                       <button style={{
@@ -693,7 +714,7 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
                         fontWeight: 700, fontSize: 11, letterSpacing: '0.07em',
                         cursor: 'pointer', whiteSpace: 'nowrap', textTransform: 'uppercase',
                       }}>
-                        Connect
+                        {t('brandBrain.igConnectBtn')}
                       </button>
                     </a>
                   </div>
@@ -706,9 +727,9 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
           <section ref={el => { sectionRefs.current['assets'] = el }} id="assets" style={{ scrollMarginTop: 24 }}>
             <Card>
               <div>
-                <SectionHeader num="05" title="Brand Assets" done={false} />
+                <SectionHeader num="05" title={t('brandBrain.sectionAssets')} done={false} completeLabel={t('brandBrain.complete')} />
                 <p style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', fontWeight: 300, lineHeight: 1.7 }}>
-                  Photos, logos, and product images the AI references when generating visuals.
+                  {t('assets.uploadDrop')} {t('assets.uploadFormats')}
                 </p>
               </div>
               <AssetUploader assets={assets} userId={userId} onAssetsChange={setAssets} />

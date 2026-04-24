@@ -2,9 +2,10 @@
 import { useState } from 'react'
 import { Textarea } from '@/components/ui/Input'
 import type { BrandBrainForm } from '@/types'
+import { useLanguage } from '@/lib/i18n/context'
 
-const TONES = ['Professional','Friendly','Inspiring','Authoritative','Playful',
-               'Luxurious','Minimal','Bold','Warm','Humorous','Informative','Passionate']
+const TONE_KEYS = ['Professional','Friendly','Inspiring','Authoritative','Playful',
+                   'Luxurious','Minimal','Bold','Warm','Humorous','Informative','Passionate'] as const
 
 interface Props {
   data: BrandBrainForm
@@ -14,20 +15,21 @@ interface Props {
 }
 
 export function Step3Tone({ data, onChange, onNext, onBack }: Props) {
+  const { t } = useLanguage()
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  function toggleTone(t: string) {
+  function toggleTone(key: string) {
     const curr = data.tone_keywords
-    if (curr.includes(t)) onChange({ tone_keywords: curr.filter(k => k !== t) })
-    else if (curr.length < 3) onChange({ tone_keywords: [...curr, t] })
+    if (curr.includes(key)) onChange({ tone_keywords: curr.filter(k => k !== key) })
+    else if (curr.length < 3) onChange({ tone_keywords: [...curr, key] })
   }
 
   function handleNext() {
     const e: Record<string, string> = {}
-    if (data.tone_keywords.length === 0) e.tone_keywords   = 'Select at least one tone'
-    if (!data.tone_description.trim())   e.tone_description = 'Required'
-    if (!data.target_audience.trim())    e.target_audience  = 'Required'
-    if (!data.audience_problem.trim())   e.audience_problem = 'Required'
+    if (data.tone_keywords.length === 0) e.tone_keywords   = t('onboarding.toneError')
+    if (!data.tone_description.trim())   e.tone_description = t('common.required')
+    if (!data.target_audience.trim())    e.target_audience  = t('common.required')
+    if (!data.audience_problem.trim())   e.audience_problem = t('common.required')
     setErrors(e)
     if (Object.keys(e).length === 0) onNext()
   }
@@ -36,43 +38,43 @@ export function Step3Tone({ data, onChange, onNext, onBack }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <div>
         <label style={{ display: 'block', fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'rgba(196,185,154,0.5)', fontWeight: 300, marginBottom: 12 }}>
-          Brand tone — select 1–3
+          {t('onboarding.toneSelect')}
         </label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-          {TONES.map(t => (
+          {TONE_KEYS.map(key => (
             <button
-              key={t}
-              onClick={() => toggleTone(t)}
-              className={`ob-chip${data.tone_keywords.includes(t) ? ' ob-chip-on' : ''}`}
+              key={key}
+              onClick={() => toggleTone(key)}
+              className={`ob-chip${data.tone_keywords.includes(key) ? ' ob-chip-on' : ''}`}
             >
-              {t}
+              {t(`onboarding.tone.${key}`)}
             </button>
           ))}
         </div>
         {errors.tone_keywords && <p style={{ fontSize: 11, color: 'var(--error)', marginTop: 8, fontFamily: 'var(--font-ibm)' }}>{errors.tone_keywords}</p>}
       </div>
 
-      <Textarea label="Describe your brand voice in detail *" rows={3}
-        placeholder="e.g. Sophisticated yet approachable, speaks to professionals who value quality..."
+      <Textarea label={t('onboarding.toneVoice')} rows={3}
+        placeholder={t('onboarding.toneVoicePlaceholder')}
         value={data.tone_description}
         onChange={e => { onChange({ tone_description: e.target.value }); setErrors(p => ({ ...p, tone_description: '' })) }}
         error={errors.tone_description} />
 
-      <Textarea label="Who is your target audience? *" rows={2}
-        placeholder="e.g. Entrepreneurs aged 25–45 who value premium experiences"
+      <Textarea label={t('onboarding.targetAudience')} rows={2}
+        placeholder={t('onboarding.targetAudiencePlaceholder')}
         value={data.target_audience}
         onChange={e => { onChange({ target_audience: e.target.value }); setErrors(p => ({ ...p, target_audience: '' })) }}
         error={errors.target_audience} />
 
-      <Textarea label="What problem do you solve for them? *" rows={2}
-        placeholder="e.g. They want exceptional quality without leaving home"
+      <Textarea label={t('onboarding.audienceProblem')} rows={2}
+        placeholder={t('onboarding.audienceProblemPlaceholder')}
         value={data.audience_problem}
         onChange={e => { onChange({ audience_problem: e.target.value }); setErrors(p => ({ ...p, audience_problem: '' })) }}
         error={errors.audience_problem} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 }}>
-        <button className="ob-btn-ghost" onClick={onBack}>← Back</button>
-        <button className="ob-btn" onClick={handleNext}>Continue →</button>
+        <button className="ob-btn-ghost" onClick={onBack}>{t('common.back')}</button>
+        <button className="ob-btn" onClick={handleNext}>{t('common.continue')}</button>
       </div>
     </div>
   )

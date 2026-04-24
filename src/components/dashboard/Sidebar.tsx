@@ -1,6 +1,7 @@
 'use client'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useLanguage } from '@/lib/i18n/context'
 
 interface Props {
   userEmail: string
@@ -26,6 +27,7 @@ function getInitials(name: string, email: string): string {
 export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, instagramConnected, collapsed, onToggle, onMobileClose }: Props) {
   const pathname = usePathname()
   const router   = useRouter()
+  const { t } = useLanguage()
 
   async function signOut() {
     const supabase = createClient()
@@ -37,17 +39,17 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
   const isActive = (href: string) => pathname === href || (href !== '/dashboard/overview' && pathname.startsWith(href))
 
   const navItems = [
-    { href: '/dashboard/overview',           label: 'Overview',           icon: 'dashboard' },
-    { href: '/dashboard/posts',              label: 'Posts',              icon: 'calendar_view_month', badge: pendingCount > 0 ? pendingCount : null },
-    { href: '/dashboard/product-photos',     label: 'Product Photos',     icon: 'camera_enhance' },
-    { href: '/dashboard/caption-generator',  label: 'Caption Generator',  icon: 'auto_awesome' },
-    { href: '/dashboard/templates',          label: 'Templates',          icon: 'grid_view' },
-    { href: '/dashboard/statistics',         label: 'Analytics',          icon: 'monitoring' },
-    { href: '/dashboard/brand-brain',        label: 'Brand Brain',        icon: 'psychology' },
+    { href: '/dashboard/overview',           label: t('nav.overview'),          icon: 'dashboard' },
+    { href: '/dashboard/posts',              label: t('nav.posts'),             icon: 'calendar_view_month', badge: pendingCount > 0 ? pendingCount : null },
+    { href: '/dashboard/product-photos',     label: t('nav.productPhotos'),     icon: 'camera_enhance' },
+    { href: '/dashboard/caption-generator',  label: t('nav.captionGenerator'),  icon: 'auto_awesome' },
+    { href: '/dashboard/templates',          label: t('nav.templates'),         icon: 'grid_view' },
+    { href: '/dashboard/statistics',         label: t('nav.analytics'),         icon: 'monitoring' },
+    { href: '/dashboard/brand-brain',        label: t('nav.brandBrain'),        icon: 'psychology' },
   ]
 
   const bottomItems = [
-    { href: '/api/instagram/auth',  label: 'Instagram', icon: 'photo_camera' },
+    { href: '/api/instagram/auth',  label: t('nav.instagram'), icon: 'photo_camera' },
   ]
 
   return (
@@ -105,7 +107,7 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
       }}>
 
         {/* Toggle button */}
-        <button className="sb2-toggle" onClick={onToggle} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+        <button className="sb2-toggle" onClick={onToggle} title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}>
           <svg width="8" height="12" viewBox="0 0 8 12" fill="none">
             {collapsed
               ? <path d="M2 1L6 6L2 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -156,7 +158,7 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
                 Lumen
               </div>
               <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 3, fontWeight: 500 }}>
-                The Curated Archive
+                {t('nav.tagline')}
               </div>
             </div>
           </div>
@@ -216,7 +218,7 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
                   <span className="sb2-label">{item.label}</span>
                   {item.href === '/api/instagram/auth' && (
                     <span style={{ marginLeft: 'auto', fontSize: 9, padding: '2px 7px', borderRadius: 20, flexShrink: 0, ...(instagramConnected ? { background: 'rgba(110,191,139,0.12)', color: '#6EBF8B' } : { background: 'rgba(201,194,181,0.08)', color: 'var(--muted)' }) }}>
-                      {instagramConnected ? 'Live' : 'Connect'}
+                      {instagramConnected ? t('nav.igLive') : t('nav.igConnect')}
                     </span>
                   )}
                 </a>
@@ -232,12 +234,12 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
                   {userName || userEmail.split('@')[0]}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }}>
-                  {plan} plan
+                  {plan} {t('nav.plan')}
                 </div>
               </div>
               <button
                 onClick={signOut}
-                title="Sign out"
+                title={t('nav.signOut')}
                 style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: 4, borderRadius: 6, flexShrink: 0, transition: 'color 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--parchment)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}

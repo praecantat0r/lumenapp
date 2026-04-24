@@ -1,7 +1,10 @@
 'use client'
 import { LumenMark } from '@/components/ui/LumenLogo'
+import { useLanguage } from '@/lib/i18n/context'
 
 export function OnboardingSuccess() {
+  const { t } = useLanguage()
+
   return (
     <>
       <style>{`
@@ -55,14 +58,14 @@ export function OnboardingSuccess() {
             color: '#F6F2EA', letterSpacing: '-0.03em',
             lineHeight: 1.05, marginBottom: 6,
           }}>
-            Brand Brain
+            {t('onboarding.successTitle')}
           </h1>
           <p className="sc-p" style={{
             fontFamily: 'var(--font-ibm)', fontStyle: 'italic',
             fontWeight: 300, fontSize: 22,
             color: '#D4A84B', marginBottom: 24,
           }}>
-            is live.
+            {t('onboarding.successSubtitle')}
           </p>
           <p className="sc-sub" style={{
             fontFamily: 'var(--font-ibm)', fontWeight: 300,
@@ -70,13 +73,13 @@ export function OnboardingSuccess() {
             color: 'rgba(196,185,154,0.5)',
             maxWidth: 340,
           }}>
-            All your brand settings are saved. Lumen will now create content in the spirit of your brand — automatically.
+            {t('onboarding.successBody')}
           </p>
         </div>
 
         <div className="sc-sub" style={{ marginTop: 40 }}>
           <p style={{ fontFamily: 'var(--font-ibm)', fontSize: 11, color: 'rgba(196,185,154,0.28)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            Redirecting to dashboard…
+            {t('onboarding.successRedirect')}
           </p>
         </div>
       </div>

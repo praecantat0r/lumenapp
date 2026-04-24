@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/Input'
 import type { BrandBrainForm } from '@/types'
+import { useLanguage } from '@/lib/i18n/context'
 
 const PLATFORMS = [
   { id: 'instagram', label: 'Instagram', symbol: '◎' },
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Props) {
+  const { t } = useLanguage()
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   function togglePlatform(id: string) {
@@ -30,8 +32,8 @@ export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Pro
 
   function handleSubmit() {
     const e: Record<string, string> = {}
-    if (data.platforms.length === 0) e.platforms = 'Select at least one platform'
-    if (!data.posting_frequency)     e.posting_frequency = 'Required'
+    if (data.platforms.length === 0) e.platforms = t('onboarding.platformsError')
+    if (!data.posting_frequency)     e.posting_frequency = t('common.required')
     setErrors(e)
     if (Object.keys(e).length === 0) onSubmit()
   }
@@ -40,7 +42,7 @@ export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Pro
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <div>
         <label style={{ display: 'block', fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'rgba(196,185,154,0.5)', fontWeight: 300, marginBottom: 12 }}>
-          Platforms *
+          {t('onboarding.platforms')}
         </label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           {PLATFORMS.map(p => (
@@ -59,7 +61,7 @@ export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Pro
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <label style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'rgba(196,185,154,0.5)', fontWeight: 300 }}>
-          Posting frequency *
+          {t('onboarding.postingFrequency')}
         </label>
         <select
           value={data.posting_frequency}
@@ -71,15 +73,15 @@ export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Pro
         {errors.posting_frequency && <p style={{ fontSize: 11, color: 'var(--error)', fontFamily: 'var(--font-ibm)' }}>{errors.posting_frequency}</p>}
       </div>
 
-      <Input label="Posting time (optional)"
-        placeholder="e.g. 9:00 or 9:00, 18:00"
+      <Input label={t('onboarding.postingTime')}
+        placeholder={t('onboarding.postingTimePlaceholder')}
         value={data.posting_time}
         onChange={e => onChange({ posting_time: e.target.value })} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 }}>
-        <button className="ob-btn-ghost" onClick={onBack}>← Back</button>
+        <button className="ob-btn-ghost" onClick={onBack}>{t('common.back')}</button>
         <button className="ob-btn" onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Setting up…' : 'Complete Setup →'}
+          {loading ? t('onboarding.settingUp') : t('onboarding.completeSetup')}
         </button>
       </div>
     </div>

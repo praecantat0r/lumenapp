@@ -7,6 +7,7 @@ import { GeneratingModal } from './GeneratingModal'
 import { GeneratePostModal } from './GeneratePostModal'
 import type { Post, BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
+import { useLanguage } from '@/lib/i18n/context'
 
 type Filter = 'all' | 'pending_review' | 'approved' | 'published' | 'failed'
 
@@ -17,9 +18,7 @@ const STATUS_BADGE: Record<string, { bg: string; color: string; border: string }
   failed:         { bg: 'rgba(224,112,112,.14)', color: '#E07070', border: '1px solid rgba(224,112,112,.25)' },
   generating:     { bg: 'rgba(120,112,88,.15)',  color: '#C4B99A', border: '1px solid rgba(120,112,88,.2)' },
 }
-const STATUS_LABELS: Record<string, string> = {
-  pending_review: 'Pending review', approved: 'Approved', published: 'Published', failed: 'Failed', generating: 'Generating…'
-}
+// STATUS_LABELS is built inside the component using t() to support live translation
 
 interface Props {
   posts: Post[]
@@ -33,11 +32,20 @@ interface Props {
 
 export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQuery = '', initialFilter = 'all', page, totalPages }: Props) {
   const router                = useRouter()
+  const { t } = useLanguage()
   const [query, setQuery]     = useState(initialQuery)
   const [selected, setSelected] = useState<Post | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [genStep, setGenStep] = useState('Analyzing brand identity…')
+  const [genStep, setGenStep] = useState('')
+
+  const STATUS_LABELS: Record<string, string> = {
+    pending_review: t('posts.statusPending'),
+    approved:       t('posts.statusApproved'),
+    published:      t('posts.statusPublished'),
+    failed:         t('posts.statusFailed'),
+    generating:     t('posts.statusGenerating'),
+  }
   const [posts, setPosts]     = useState(initialPosts)
   useEffect(() => { setPosts(initialPosts) }, [initialPosts])
   const [deleting, setDeleting] = useState(false)
@@ -76,23 +84,22 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
   function closeDetail() { setPanelOpen(false); setTimeout(() => setSelected(null), 300) }
 
   async function deletePost(id: string) {
-    if (!confirm('Delete this post? This cannot be undone.')) return
+    if (!confirm(t('posts.deleteConfirm'))) return
     setDeleting(true)
     try {
       const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' })
-      if (!res.ok) { const e = await res.json(); toast.error(e.error || 'Delete failed'); return }
+      if (!res.ok) { const e = await res.json(); toast.error(e.error || t('posts.toastFailed')); return }
       setPosts(prev => prev.filter(p => p.id !== id))
       closeDetail()
-      toast.success('Post deleted.')
+      toast.success(t('posts.toastDeleted'))
       router.refresh()
     } finally {
       setDeleting(false)
     }
   }
 
-  const STEPS = ['Analyzing brand identity…', 'Crafting visual concept…', 'Generating image…', 'Writing caption…', 'Composing final design…']
-
   async function generatePost(config: { assetMode: 'original' | 'auto' | 'specific' | 'composite'; assetUrl?: string; assetName?: string; assetType?: string; assetDescription?: string; scenicAssetUrl?: string; scenicAssetName?: string; scenicAssetDescription?: string; productAssetUrl?: string; productAssetName?: string; productAssetDescription?: string }) {
+    const STEPS = [t('posts.genStep1'), t('posts.genStep2'), t('posts.genStep3'), t('posts.genStep4'), t('posts.genStep5')]
     setShowGenModal(false)
     setGenerating(true)
     setGenStep(STEPS[0])
@@ -122,17 +129,17 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
             clearInterval(stepInterval)
             setGenerating(false)
             if (d.status === 'pending_review') {
-              toast.success('Post ready for review!')
+              toast.success(t('posts.toastReady'))
               router.refresh()
             } else {
-              toast.error('Generation failed.')
+              toast.error(t('posts.toastFailed'))
             }
           }
         } catch { /* ignore */ }
       }, 3000)
     } catch (err: unknown) {
       clearInterval(stepInterval)
-      toast.error(err instanceof Error ? err.message : 'Generation failed')
+      toast.error(err instanceof Error ? err.message : t('posts.toastFailed'))
       setGenerating(false)
     }
   }
@@ -241,9 +248,9 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
         flexShrink: 0, background: 'var(--carbon)',
       }}>
         <div>
-          <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600 }}>Content Library</span>
+          <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600 }}>{t('posts.headerLabel')}</span>
           <h1 style={{ fontFamily: 'var(--font-syne)', fontSize: 32, fontWeight: 800, color: 'var(--parchment)', letterSpacing: '-0.03em', lineHeight: 1.1, marginTop: 4 }}>
-            Post Archive
+            {t('posts.title')}
           </h1>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -264,7 +271,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
             ) : (
               <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
             )}
-            Generate Post
+            {t('posts.generatePost')}
           </button>
         </div>
       </div>
@@ -277,22 +284,22 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
       }}>
         <div className="pt-chips-row" style={{ display: 'flex', gap: 4, flexWrap: 'nowrap' }}>
           {([
-            { id: 'all',            label: 'All',      count: counts.all,            countColor: 'var(--sand)' },
-            { id: 'pending_review', label: 'Pending',  count: counts.pending_review, countColor: '#b68d40' },
-            { id: 'approved',       label: 'Approved', count: counts.approved,       countColor: '#6EBF8B' },
-            { id: 'published',      label: 'Published',count: counts.published,      countColor: '#7AABFF' },
-            { id: 'failed',         label: 'Failed',   count: counts.failed,         countColor: '#ffb4ab' },
-          ] as const).map(t => (
-            <button key={t.id} onClick={() => navigate(t.id as Filter, 1)} className={`pt-chip${filter === t.id ? ' pt-active' : ''}`}>
-              {t.label}
-              {t.count > 0 && (
+            { id: 'all',            label: t('posts.filterAll'),       count: counts.all,            countColor: 'var(--sand)' },
+            { id: 'pending_review', label: t('posts.filterPending'),   count: counts.pending_review, countColor: '#b68d40' },
+            { id: 'approved',       label: t('posts.filterApproved'),  count: counts.approved,       countColor: '#6EBF8B' },
+            { id: 'published',      label: t('posts.filterPublished'), count: counts.published,      countColor: '#7AABFF' },
+            { id: 'failed',         label: t('posts.filterFailed'),    count: counts.failed,         countColor: '#ffb4ab' },
+          ] as const).map(chip => (
+            <button key={chip.id} onClick={() => navigate(chip.id as Filter, 1)} className={`pt-chip${filter === chip.id ? ' pt-active' : ''}`}>
+              {chip.label}
+              {chip.count > 0 && (
                 <span style={{
                   fontSize: 10, minWidth: 18, padding: '1px 6px', borderRadius: 9999,
-                  background: filter === t.id ? `${t.countColor}25` : 'rgba(255,255,255,0.07)',
-                  color: filter === t.id ? t.countColor : 'var(--muted)',
+                  background: filter === chip.id ? `${chip.countColor}25` : 'rgba(255,255,255,0.07)',
+                  color: filter === chip.id ? chip.countColor : 'var(--muted)',
                   fontWeight: 700, lineHeight: '16px', display: 'inline-block', textAlign: 'center',
                 }}>
-                  {t.count}
+                  {chip.count}
                 </span>
               )}
             </button>
@@ -303,7 +310,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search posts…"
+            placeholder={t('posts.searchPlaceholder')}
             className="pt-search-input"
             style={{
               background: 'var(--surface-2)', border: '1px solid rgba(78,69,56,0.3)',
@@ -338,8 +345,8 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                   <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(182,141,64,0.08)', border: '1px solid rgba(182,141,64,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--candle)', opacity: 0.5 }}>search_off</span>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-syne)', fontSize: 18, fontWeight: 700, color: 'var(--sand)', marginBottom: 8 }}>No posts found</div>
-                  <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 280 }}>Try adjusting your filters or generate a new post.</div>
+                  <div style={{ fontFamily: 'var(--font-syne)', fontSize: 18, fontWeight: 700, color: 'var(--sand)', marginBottom: 8 }}>{t('posts.noPostsFound')}</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 280 }}>{t('posts.noPostsHint')}</div>
                 </div>
               )}
 
@@ -432,7 +439,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--sand)'; e.currentTarget.style.color = 'var(--parchment)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M2 9.5V12h2.5l7-7L9 2.5l-7 7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
-                  Edit
+                  {t('posts.edit')}
                 </button>
               </div>
             </div>
@@ -457,10 +464,10 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                   <>
                     <div style={{ display: 'flex', gap: 16, background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
                       {[
-                        { val: an(selected).reach >= 1000 ? `${(an(selected).reach/1000).toFixed(1)}k` : an(selected).reach, label: 'Reach' },
-                        { val: an(selected).likes,    label: 'Likes' },
-                        { val: an(selected).comments, label: 'Comments' },
-                        { val: an(selected).engagement_rate ? `${an(selected).engagement_rate}%` : '—', label: 'Eng. rate' },
+                        { val: an(selected).reach >= 1000 ? `${(an(selected).reach/1000).toFixed(1)}k` : an(selected).reach, label: t('posts.reach') },
+                        { val: an(selected).likes,    label: t('posts.likes') },
+                        { val: an(selected).comments, label: t('posts.comments') },
+                        { val: an(selected).engagement_rate ? `${an(selected).engagement_rate}%` : '—', label: t('posts.engRate') },
                       ].map(stat => (
                         <div key={stat.label} style={{ flex: 1, textAlign: 'center' }}>
                           <div style={{ fontFamily: 'var(--font-syne)', fontSize: 20, fontWeight: 700, color: 'var(--candle)' }}>{stat.val || '—'}</div>
@@ -473,11 +480,11 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                 )}
 
                 {/* Caption */}
-                <div style={{ fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 400, marginBottom: 8, fontFamily: 'var(--font-ibm)' }}>Caption</div>
+                <div style={{ fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 400, marginBottom: 8, fontFamily: 'var(--font-ibm)' }}>{t('posts.caption')}</div>
                 <div style={{ fontSize: 12, lineHeight: 1.8, color: 'var(--sand)', fontWeight: 300, whiteSpace: 'pre-wrap', marginBottom: 16, fontFamily: 'var(--font-ibm)' }}>{selected.caption || '—'}</div>
 
                 {/* Hashtags */}
-                <div style={{ fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 400, marginBottom: 8, fontFamily: 'var(--font-ibm)' }}>Hashtags</div>
+                <div style={{ fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 400, marginBottom: 8, fontFamily: 'var(--font-ibm)' }}>{t('posts.hashtags')}</div>
                 <div style={{ fontSize: 11, color: 'var(--ember)', fontWeight: 300, lineHeight: 1.7, marginBottom: 20, fontFamily: 'var(--font-ibm)' }}>{selected.hashtags || '—'}</div>
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 16px' }}/>
@@ -485,12 +492,12 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                 {/* Meta */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
                   {[
-                    { label: 'Date',     val: format(new Date(selected.created_at), 'MMM d, yyyy') },
-                    { label: 'Template', val: (selected.generation_metadata as Record<string, string>)?.pool_template_name || '—' },
-                    { label: 'AI model', val: 'Claude Sonnet + Haiku', small: true },
+                    { label: t('posts.date'),     val: format(new Date(selected.created_at), 'MMM d, yyyy') },
+                    { label: t('posts.template'), val: (selected.generation_metadata as Record<string, string>)?.pool_template_name || '—' },
+                    { label: t('posts.aiModel'),  val: 'Claude Sonnet + Haiku', small: true },
                     selected.instagram_permalink
-                      ? { label: 'Instagram', val: 'View post ↗', link: selected.instagram_permalink }
-                      : { label: 'Status',    val: STATUS_LABELS[selected.status] },
+                      ? { label: t('posts.instagram'), val: t('posts.viewPost'), link: selected.instagram_permalink }
+                      : { label: t('posts.status'),    val: STATUS_LABELS[selected.status] },
                   ].map(m => (
                     <div key={m.label}>
                       <div style={{ fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4, fontFamily: 'var(--font-ibm)' }}>{m.label}</div>
@@ -513,41 +520,41 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                   <button onClick={() => router.push(`/dashboard/post/${selected.id}`)}
                     style={{ width: '100%', background: 'var(--candle)', color: '#ffffff', border: 'none', padding: '11px 0', fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 12, letterSpacing: '.05em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 7 }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--ember)')} onMouseLeave={e => (e.currentTarget.style.background = 'var(--candle)')}>
-                    Edit & Review
+                    {t('posts.editReview')}
                   </button>
                   <button onClick={async () => {
-                    if (!confirm('Approve and publish this post to Instagram?')) return
+                    if (!confirm(t('posts.approveConfirm'))) return
                     const res = await fetch(`/api/posts/${selected.id}/publish`, { method: 'POST' })
-                    if (res.ok) { toast.success('Published!'); closeDetail(); router.refresh() }
-                    else { const e = await res.json(); toast.error(e.error || 'Publish failed') }
+                    if (res.ok) { toast.success(t('posts.toastPublished')); closeDetail(); router.refresh() }
+                    else { const e = await res.json(); toast.error(e.error || t('posts.toastPublishFailed')) }
                   }}
                     style={{ width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--sand)', padding: '10px 0', fontFamily: 'var(--font-ibm)', fontSize: 12, cursor: 'pointer', borderRadius: 7 }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(212,168,75,.4)'; e.currentTarget.style.color = 'var(--parchment)' }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
-                    Approve & Publish
+                    {t('posts.approvePublish')}
                   </button>
                 </>
               )}
               {selected.status === 'approved' && (
                 <button onClick={async () => {
-                  if (!confirm('Publish this post to Instagram now?')) return
+                  if (!confirm(t('posts.publishConfirm'))) return
                   const res = await fetch(`/api/posts/${selected.id}/publish`, { method: 'POST' })
-                  if (res.ok) { toast.success('Published!'); closeDetail(); router.refresh() }
-                  else { const e = await res.json(); toast.error(e.error || 'Publish failed') }
+                  if (res.ok) { toast.success(t('posts.toastPublished')); closeDetail(); router.refresh() }
+                  else { const e = await res.json(); toast.error(e.error || t('posts.toastPublishFailed')) }
                 }}
                   style={{ width: '100%', background: 'var(--candle)', color: '#ffffff', border: 'none', padding: '11px 0', fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 12, letterSpacing: '.05em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 7 }}>
-                  Publish Now
+                  {t('posts.publishNow')}
                 </button>
               )}
               {selected.status === 'failed' && (
                 <button style={{ width: '100%', background: 'transparent', border: '1px solid rgba(224,112,112,.25)', color: '#E07070', padding: '10px 0', fontFamily: 'var(--font-ibm)', fontSize: 12, cursor: 'pointer', borderRadius: 7 }}>
-                  Retry Generation
+                  {t('posts.retryGeneration')}
                 </button>
               )}
               {selected.instagram_permalink && (
                 <a href={selected.instagram_permalink} target="_blank" rel="noreferrer"
                   style={{ width: '100%', display: 'block', textAlign: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--sand)', padding: '10px 0', fontFamily: 'var(--font-ibm)', fontSize: 12, cursor: 'pointer', borderRadius: 7, textDecoration: 'none' }}>
-                  View on Instagram ↗
+                  {t('posts.viewOnInstagram')}
                 </a>
               )}
               <button
@@ -556,7 +563,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                 style={{ width: '100%', marginTop: 4, background: 'transparent', border: '1px solid rgba(192,57,43,.25)', color: 'rgba(192,57,43,.65)', padding: '9px 0', fontFamily: 'var(--font-ibm)', fontSize: 11, cursor: deleting ? 'not-allowed' : 'pointer', borderRadius: 7, opacity: deleting ? 0.5 : 1 }}
                 onMouseEnter={e => { if (!deleting) { e.currentTarget.style.borderColor = 'rgba(192,57,43,.6)'; e.currentTarget.style.color = '#c0392b' }}}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(192,57,43,.25)'; e.currentTarget.style.color = 'rgba(192,57,43,.65)' }}>
-                {deleting ? 'Deleting…' : 'Delete post'}
+                {deleting ? t('common.deleting') : t('posts.deletePost')}
               </button>
             </div>
           </>

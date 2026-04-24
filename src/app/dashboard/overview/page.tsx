@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { OverviewPendingPost } from '@/components/dashboard/OverviewPendingPost'
 import { OverviewGenerateButton } from '@/components/dashboard/OverviewGenerateButton'
 import { OverviewSearch } from '@/components/dashboard/OverviewSearch'
 import type { Post } from '@/types'
+import { t as tr, type LangCode } from '@/lib/i18n/translations'
 // penis
 
 export default async function OverviewPage() {
@@ -10,6 +12,10 @@ export default async function OverviewPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   //picus
+
+  const cookieStore = await cookies()
+  const lang = (cookieStore.get('lumen-lang')?.value ?? 'en') as LangCode
+  const t = (key: string) => tr(lang, key)
 
   const now        = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
@@ -41,25 +47,25 @@ export default async function OverviewPage() {
     if (!isNaN(d.getTime())) daysWithPosts.add(d.getDay())
   }
 
-  const weekDays3 = ['Mon','Tue','Wed']
+  const weekDays3 = [t('overview.days.Mon'), t('overview.days.Tue'), t('overview.days.Wed')]
 
   const kpiCards = [
     {
-      label: 'Posts this month',
+      label: t('overview.postsThisMonth'),
       value: postsThisMonth.toString(),
       trend: postsThisMonth > 0 ? '+4 vs last month' : null,
       bar: Math.min((postsThisMonth / 20) * 100, 100),
     },
     {
-      label: 'Avg. Engagement',
+      label: t('overview.avgEngagement'),
       value: '—',
       bars: true,
     },
     {
-      label: 'Total Reach',
+      label: t('overview.totalReach'),
       value: totalReach > 1000 ? `${(totalReach / 1000).toFixed(1)}k` : totalReach > 0 ? totalReach.toString() : '—',
       trend: totalReach > 0 ? '+14.2% from last month' : null,
-      sub: 'This month',
+      sub: t('overview.thisMonth'),
     },
   ]
 
@@ -125,15 +131,15 @@ export default async function OverviewPage() {
         background: 'var(--carbon)',
       }}>
         <div>
-          <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600 }}>Lumen Dashboard</span>
-          <h1 style={{ fontFamily: 'var(--font-syne)', fontSize: 32, fontWeight: 800, letterSpacing: '-.03em', color: 'var(--parchment)', lineHeight: 1.1, marginTop: 4 }}>Overview</h1>
+          <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 600 }}>{t('overview.headerLabel')}</span>
+          <h1 style={{ fontFamily: 'var(--font-syne)', fontSize: 32, fontWeight: 800, letterSpacing: '-.03em', color: 'var(--parchment)', lineHeight: 1.1, marginTop: 4 }}>{t('overview.title')}</h1>
         </div>
         <div className="ov-topbar-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div className="ov-search-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div className="ov-search-wrap"><OverviewSearch /></div>
             <OverviewGenerateButton />
           </div>
-          <a href="/dashboard/posts" className="ov-ghost-btn">View all posts</a>
+          <a href="/dashboard/posts" className="ov-ghost-btn">{t('overview.viewAllPosts')}</a>
         </div>
       </div>
 
@@ -225,16 +231,16 @@ export default async function OverviewPage() {
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexShrink: 0 }}>
             <div>
               <h2 style={{ fontFamily: 'var(--font-syne)', fontSize: 17, fontWeight: 700, color: 'var(--parchment)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: 2 }}>
-                Pending Review
+                {t('overview.pendingReview')}
               </h2>
               <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>
                 {pendingCount !== null && pendingCount > 0
-                  ? `${pendingCount} item${pendingCount > 1 ? 's' : ''} require your attention today`
-                  : 'All clear — no posts waiting'}
+                  ? t('overview.pendingItems').replace('{n}', String(pendingCount)).replace('{s}', pendingCount > 1 ? 's' : '')
+                  : t('overview.allClear')}
               </p>
             </div>
             <a href="/dashboard/posts" style={{ fontSize: 11, color: 'var(--candle)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 700, fontFamily: 'var(--font-ibm)' }}>
-              View all queue <span className="material-symbols-outlined" style={{ fontSize: 12 }}>arrow_forward</span>
+              {t('overview.viewAllQueue')} <span className="material-symbols-outlined" style={{ fontSize: 12 }}>arrow_forward</span>
             </a>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -253,13 +259,13 @@ export default async function OverviewPage() {
             <span className="material-symbols-outlined" style={{ position: 'absolute', right: 20, top: 14, fontSize: 64, color: 'var(--candle)', opacity: 0.055, pointerEvents: 'none', fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--candle)', fontVariationSettings: "'FILL' 1" }}>lightbulb</span>
-              <span style={{ fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 700, fontFamily: 'var(--font-ibm)' }}>Strategic Recommendation</span>
+              <span style={{ fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--candle)', fontWeight: 700, fontFamily: 'var(--font-ibm)' }}>{t('overview.strategicRec')}</span>
             </div>
             <h3 style={{ fontFamily: 'var(--font-syne)', fontSize: 15, fontWeight: 700, color: 'var(--parchment)', letterSpacing: '-0.02em', marginBottom: 8 }}>
-              Prime Posting Opportunity
+              {t('overview.primePosting')}
             </h3>
             <p style={{ fontSize: 12, color: 'var(--sand)', lineHeight: 1.7, fontFamily: 'var(--font-ibm)', marginBottom: 14 }}>
-              Your audience engagement peaks between <strong style={{ color: 'var(--parchment)', fontWeight: 600 }}>18:00 and 20:00</strong> on Tuesdays. We suggest shifting your content to this window to maximize organic reach.
+              {t('overview.primePostingBody').replace('{from}', '18:00').replace('{to}', '20:00').replace('{day}', t('overview.days.Tue'))}
             </p>
             <button className="ov-adj" style={{
               display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 16px', borderRadius: 9999,
@@ -267,7 +273,7 @@ export default async function OverviewPage() {
               color: 'var(--candle)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
               fontFamily: 'var(--font-ibm)', transition: 'background 0.15s',
             }}>
-              Adjust Schedule
+              {t('overview.adjustSchedule')}
             </button>
           </div>
 
@@ -278,7 +284,7 @@ export default async function OverviewPage() {
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
-              <h3 style={{ fontFamily: 'var(--font-syne)', fontSize: 13, fontWeight: 700, color: 'var(--parchment)', letterSpacing: '-0.01em' }}>Weekly Flow</h3>
+              <h3 style={{ fontFamily: 'var(--font-syne)', fontSize: 13, fontWeight: 700, color: 'var(--parchment)', letterSpacing: '-0.01em' }}>{t('overview.weeklyFlow')}</h3>
               <div style={{ display: 'flex', gap: 3 }}>
                 {(['arrow_back_ios','arrow_forward_ios'] as const).map(icon => (
                   <button key={icon} style={{ padding: '3px', background: 'none', border: '1px solid rgba(78,69,56,0.2)', borderRadius: 9999, cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}>
@@ -305,8 +311,8 @@ export default async function OverviewPage() {
                     </div>
                     {hasPost ? (
                       <div style={{ flex: 1, background: isToday ? 'rgba(182,141,64,0.1)' : 'var(--surface)', padding: '5px 10px', borderRadius: 8, borderLeft: `3px solid ${isToday ? 'var(--candle)' : 'rgba(78,69,56,0.3)'}` }}>
-                        <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', lineHeight: 1.3 }}>Campaign Launch</p>
-                        <p style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginTop: 1 }}>3 posts scheduled</p>
+                        <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', lineHeight: 1.3 }}>{t('overview.campaignLaunch')}</p>
+                        <p style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginTop: 1 }}>{t('overview.postsScheduled').replace('{n}', '3')}</p>
                       </div>
                     ) : (
                       <div style={{ flex: 1, border: '1.5px dashed rgba(78,69,56,0.16)', borderRadius: 8, padding: '5px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -325,7 +331,7 @@ export default async function OverviewPage() {
               fontFamily: 'var(--font-ibm)', letterSpacing: '0.06em',
               textDecoration: 'none', transition: 'color 0.15s', flexShrink: 0,
             }}>
-              Full Calendar View
+              {t('overview.fullCalendar')}
             </a>
           </div>
         </div>

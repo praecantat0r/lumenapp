@@ -12,14 +12,15 @@ import { OnboardingSuccess } from './OnboardingSuccess'
 import { LumenMark } from '@/components/ui/LumenLogo'
 import type { BrandBrainForm } from '@/types'
 import toast from 'react-hot-toast'
+import { useLanguage } from '@/lib/i18n/context'
 
-const STEPS = [
-  { number: '01', title: 'The basics',       context: 'Start by telling us your brand name, industry, and where you operate.' },
-  { number: '02', title: 'Brand identity',   context: 'Help Lumen understand your story, offerings, and what makes you different.' },
-  { number: '03', title: 'Tone & audience',  context: 'Define how Lumen should speak and exactly who it speaks to.' },
-  { number: '04', title: 'Content strategy', context: 'Set the topics, formats, and guardrails for your content.' },
-  { number: '05', title: 'Publishing',       context: 'Configure your platforms, posting frequency, and timing.' },
-  { number: '06', title: 'Connect',          context: 'Link your Instagram account so Lumen can publish directly on your behalf.' },
+const STEP_KEYS = [
+  { number: '01', titleKey: 'onboarding.steps.s1title', ctxKey: 'onboarding.steps.s1ctx' },
+  { number: '02', titleKey: 'onboarding.steps.s2title', ctxKey: 'onboarding.steps.s2ctx' },
+  { number: '03', titleKey: 'onboarding.steps.s3title', ctxKey: 'onboarding.steps.s3ctx' },
+  { number: '04', titleKey: 'onboarding.steps.s4title', ctxKey: 'onboarding.steps.s4ctx' },
+  { number: '05', titleKey: 'onboarding.steps.s5title', ctxKey: 'onboarding.steps.s5ctx' },
+  { number: '06', titleKey: 'onboarding.steps.s6title', ctxKey: 'onboarding.steps.s6ctx' },
 ]
 
 const initialForm: BrandBrainForm = {
@@ -36,6 +37,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false)
   const [done, setDone]       = useState(false)
   const router = useRouter()
+  const { t } = useLanguage()
 
   function update(fields: Partial<BrandBrainForm>) { setForm(prev => ({ ...prev, ...fields })) }
 
@@ -56,12 +58,12 @@ export function OnboardingWizard({ userId }: { userId: string }) {
             if (r.ok) {
               const result = await r.json()
               if (result.scraped_about) scraped = result
-              else toast('Website scraped but no content found — fill in the details manually.', { icon: '⚠️' })
+              else toast(t('onboarding.scrapeWarning'), { icon: '⚠️' })
             } else {
-              toast('Could not scrape website — fill in the details manually.', { icon: '⚠️' })
+              toast(t('onboarding.scrapeError'), { icon: '⚠️' })
             }
           } catch {
-            toast('Could not reach website — fill in the details manually.', { icon: '⚠️' })
+            toast(t('onboarding.scrapeNetError'), { icon: '⚠️' })
           }
         }
 
@@ -139,7 +141,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
 
   if (done) return <OnboardingSuccess />
 
-  const meta     = STEPS[step - 1]
+  const meta     = STEP_KEYS[step - 1]
   const progress = (step / 6) * 100
 
   return (
@@ -260,7 +262,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
               onClick={async () => { const s = createClient(); await s.auth.signOut(); router.push('/login') }}
               style={{ background: 'none', border: 'none', color: 'rgba(196,185,154,0.28)', fontFamily: 'var(--font-ibm)', fontSize: 10, cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase' }}
             >
-              Sign out
+              {t('onboarding.signOut')}
             </button>
           </div>
 
@@ -277,7 +279,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
             </div>
 
             <p style={{ fontFamily: 'var(--font-ibm)', fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(212,168,75,0.65)', marginBottom: 16 }}>
-              Step {step} of 6
+              {t('onboarding.stepOf').replace('{step}', String(step))}
             </p>
 
             <h2 style={{
@@ -286,7 +288,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
               lineHeight: 1.1, color: '#F6F2EA',
               letterSpacing: '-0.02em', marginBottom: 16,
             }}>
-              {meta.title}
+              {t(meta.titleKey)}
             </h2>
 
             <p style={{
@@ -294,13 +296,13 @@ export function OnboardingWizard({ userId }: { userId: string }) {
               fontSize: 13.5, lineHeight: 1.75,
               color: 'rgba(196,185,154,0.48)', maxWidth: 270,
             }}>
-              {meta.context}
+              {t(meta.ctxKey)}
             </p>
           </div>
 
           {/* Progress dots */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {STEPS.map((_, i) => (
+            {STEP_KEYS.map((_, i) => (
               <div key={i} style={{
                 height: 4,
                 width: i + 1 === step ? 22 : 4,

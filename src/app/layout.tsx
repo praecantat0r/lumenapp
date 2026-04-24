@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
 import Script from 'next/script'
+import { cookies } from 'next/headers'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { Analytics } from '@vercel/analytics/next'
+import { LanguageProvider } from '@/lib/i18n/context'
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -23,11 +25,14 @@ export const metadata: Metadata = {
   description: 'Autonomous Instagram content generation and publishing powered by AI.',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const cookieStore = await cookies()
+  const initialLang = cookieStore.get('lumen-lang')?.value ?? 'en'
+
   return (
     <html lang="en" className={`${plusJakartaSans.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
@@ -38,7 +43,9 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <LanguageProvider initialLang={initialLang}>
         {children}
+        </LanguageProvider>
         <Toaster
           position="bottom-right"
           toastOptions={{
@@ -56,3 +63,4 @@ export default function RootLayout({
     </html>
   )
 }
+
