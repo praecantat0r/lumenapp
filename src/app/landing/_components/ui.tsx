@@ -98,7 +98,7 @@ export function Button({ variant = 'primary', size = 'md', loading, children, on
 
   const hoverStyle: React.CSSProperties = hover ? (
     variant === 'primary' || variant === 'auth' ? { background: 'var(--ember)' }
-    : variant === 'ghost' ? { borderColor: 'rgba(182,141,64,.4)', color: 'var(--parchment)' }
+    : variant === 'ghost' ? { border: '1px solid rgba(182,141,64,.4)', color: 'var(--parchment)' }
     : variant === 'gold-ghost' ? { background: 'rgba(182,141,64,.2)' }
     : {}
   ) : {}

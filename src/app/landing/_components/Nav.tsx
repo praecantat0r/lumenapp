@@ -42,7 +42,7 @@ function ThemeToggle({ theme, onChange }: { theme: string; onChange: (t: string)
       onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,.4)'; e.currentTarget.style.color = 'var(--candle)' }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
     >
-      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 16 }} suppressHydrationWarning>
         {theme === 'dark' ? 'light_mode' : 'dark_mode'}
       </span>
     </button>

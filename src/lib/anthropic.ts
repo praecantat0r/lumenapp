@@ -270,15 +270,15 @@ export async function analyzeLocationPhoto(imageUrl: string): Promise<string> {
         { type: 'image', source: { type: 'url', url: imageUrl } },
         {
           type: 'text',
-          text: `Describe this location photo in precise visual detail for use as an image generation environment brief. Cover:
-- The type of space and its overall character
-- Dominant colors (name them specifically: e.g. "matte black walls", "brushed steel", "warm amber pendant lights")
-- Surface materials: floors, walls, ceilings
-- Lighting: direction, quality (hard/soft), color temperature
-- Key architectural features or design elements
+          text: `IMPORTANT: Describe ONLY what is literally visible within this photo frame — do not infer or describe what lies beyond the edges, do not interpret it as a wider space you know about. Treat it as a flat photograph.
+
+Describe this photo in precise visual detail for use as an image generation background brief. Cover:
+- What is literally visible: surfaces, objects, colors, materials (name them specifically: e.g. "matte black wall on the left third", "brushed steel shelf edge across the middle", "warm amber pendant light in top-right corner")
+- Lighting visible in the frame: direction, quality (hard/soft), color temperature
+- Key visual elements and their positions within the frame
 - Atmosphere and mood in 1–2 words
 
-IMPORTANT: Do NOT mention any TV screens, monitors, digital displays, picture frames, signage text, or logos in your description — describe only the physical environment, materials, and lighting. Write 3–5 dense sentences. Be extremely specific about colors, materials, and lighting.`,
+Do NOT mention any TV screens, monitors, digital displays, picture frames, signage text, or logos. Write 3–5 dense sentences. Be extremely specific about colors, materials, and lighting.`,
         },
       ],
     }],
@@ -632,7 +632,7 @@ Your IMAGE_PROMPT MUST begin with: "Using the attached reference image as the en
 
 After that opening, structure the IMAGE_PROMPT as:
 ① Establish the environment from inside: describe its exact colors, materials, lighting, and character using the details above (2–3 sentences) — the camera is shooting from within the space, not looking at a photo of it
-② Describe the foreground subject: ${brandBrain.include_people === false ? 'a brand-relevant product, animal, or natural subject occupying the center of the frame — do NOT include any people or human figures, and do NOT use any sign, board, or display as the subject' : 'the brand-relevant person, animal, activity, or product occupying the center of the frame — do NOT use any sign, board, or display as the subject'} — if any branded product appears, its label, logo, and branding must remain exactly as shown; do NOT strip or alter any brand marks
+② Describe the foreground subject: ${brandBrain.include_people === false ? 'a brand-relevant animal, natural subject, or lifestyle scene occupying the center of the frame — do NOT include any people or human figures, do NOT render or invent any product or packaging without a product reference image, and do NOT use any sign, board, or display as the subject' : 'the brand-relevant person, animal, activity, or lifestyle scene occupying the center of the frame — do NOT render or invent any product or packaging without a product reference image, and do NOT use any sign, board, or display as the subject'}
 ③ Camera angle and depth of field — background environment should be naturally visible but out of focus behind the subject
 ④ End with: "ultra-high resolution, editorial photography, no digital screens, no monitors, no digital displays, no underglow, no neon ground lighting, no light strips beneath objects"\n`
           : assetGuidance.type === 'product_photo'
@@ -666,8 +666,8 @@ Your IMAGE_PROMPT MUST begin with: "Using the attached reference image as the en
 
 After that opening, describe:
 ① Establish the environment from the analysis above (2–3 sentences) — describe it as the backdrop the camera is shooting in front of
-② What is happening in the scene — the brand activity, product in use, or living moment that fits the brand's topics and tone (never a sign or display)
-③ ${brandBrain.include_people === false ? 'Any product, animal, or natural subject in the foreground (NO people or human figures, NO signs or boards)' : 'Any people, animal, or subject in the foreground (if relevant) — NO signs or boards'}, clearly distinct from the background
+② What is happening in the scene — the brand activity, lifestyle moment, or living scene that fits the brand's topics and tone (never a sign or display; do NOT render or invent any product or packaging without a product reference image)
+③ ${brandBrain.include_people === false ? 'Any animal or natural subject in the foreground (NO people or human figures, NO products or packaging without a product reference image, NO signs or boards)' : 'Any people, animal, or subject in the foreground (if relevant) — NO products or packaging without a product reference image, NO signs or boards'}, clearly distinct from the background
 ④ The lighting as it appears in the reference photo — preserve its quality and temperature
 End the IMAGE_PROMPT with: "ultra-high resolution, authentic atmosphere, no digital screens, no text overlays, no underglow, no neon ground lighting, no light strips beneath objects, no unrelated props"\n`
           : assetGuidance.type === 'screenshot'
@@ -802,7 +802,7 @@ ${assetGuidance.productDescription ? `PRODUCT DETAILS — MANDATORY: These speci
 ${assetGuidance.description ? `SCENE DETAILS — MANDATORY: These specific facts about this location MUST be reflected in the atmosphere of your image:\n${sanitizeForPrompt(assetGuidance.description)}\n` : ''}
 Your IMAGE_PROMPT must produce a world-class cinematic advertisement — the product from reference image 1 as the dramatic, brilliantly lit hero filling the frame, with the environment from reference image 2 as the atmospheric backdrop. The product is the sole subject: it must dominate the frame exactly as it appears in the reference — whether that is a car, a bottle, a piece of equipment, or any other object. Do NOT substitute it with a smaller or associated object (e.g. do NOT replace a car with a car key, do NOT replace a coffee machine with a coffee cup).
 
-The IMAGE_PROMPT MUST begin with exactly this sentence: "Reference image 1 is ${sanitizeForPrompt(assetGuidance.productName, 200) || 'the product'} — photograph the exact object shown in reference image 1 as the absolute hero, preserving every detail of its appearance, shape, color, and finish precisely as shown; do NOT substitute it with any other object, accessory, or associated item. Reference image 2 is the location and environment — use its colors, architectural character, and atmosphere as the background behind the product; the scene appears softly out of focus, providing depth and environmental context without becoming the main subject."
+The IMAGE_PROMPT MUST begin with exactly this sentence: "Reference image 1 is ${sanitizeForPrompt(assetGuidance.productName, 200) || 'the product'} — photograph the exact object shown in reference image 1 as the absolute hero, preserving every detail of its appearance, shape, color, and finish precisely as shown; do NOT substitute it with any other object, accessory, or associated item. Reference image 2 is a photograph — use ONLY what is literally visible within that photo's frame as the background behind the product; do NOT extend the scene beyond the photo's edges, do NOT invent or infer what lies outside the frame, do NOT reinterpret it as a 3D environment you can rotate around — treat it as a fixed flat canvas; the visible portion of the photo appears softly out of focus behind the product, providing depth and color context without becoming the main subject."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. IMAGE_PROMPT
@@ -821,7 +821,7 @@ LIGHTING: Design a complete cinematic lighting setup that draws its color temper
 
 ATMOSPHERE: Add 1–2 subtle atmospheric details that arise naturally from the scene's character and enhance the mood — fine particles, mist, steam, caustic reflections, bokeh light scatter — whatever genuinely fits this specific location and product.
 
-BACKGROUND: Elements from reference image 2 appear behind the product — softly dissolved into bokeh (f/2.8), providing environmental depth and color context without competing for attention. The scene is the atmosphere, not the subject.
+BACKGROUND: Only the actual visible content of reference image 2 appears behind the product — softly dissolved into bokeh (f/2.8). Do not extend the scene or invent off-frame elements. You may zoom into (crop) a portion of the visible photo to fill the background, but you must not add anything that was not in the original frame. The photo is the atmosphere, not a window into a larger world.
 
 MATERIAL RENDERING: Describe the product's physical material with hyper-realistic precision — glass transparency and internal light refraction, liquid viscosity, metallic highlights, label legibility, packaging tactile detail. Every surface rendered with photographic physical accuracy.
 
@@ -836,6 +836,7 @@ ABSOLUTE PROHIBITIONS:
 — Do NOT make the scene the main subject — it is a dark atmospheric backdrop only
 — Do NOT add signage, text overlays, screens, monitors, or digital displays
 — Do NOT alter the product's label, shape, logo, or any branding detail
+— Do NOT extend, rotate, or invent scene elements beyond what is literally visible in reference image 2 — use only what the photo actually shows
 ${brandBrain.include_people === false ? '— Do NOT include any people, humans, persons, figures, hands, or body parts — the scene must be entirely people-free\n' : ''}The product's label and branding must remain fully visible and legible.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

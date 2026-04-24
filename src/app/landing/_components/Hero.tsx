@@ -7,14 +7,14 @@ import { useBreakpoint } from './useBreakpoint'
 function HeroGlow({ theme }: { theme: string }) {
   return (
     <>
-      <div style={{
+      <div suppressHydrationWarning style={{
         position: 'absolute', top: -200, left: '50%', transform: 'translateX(-50%)',
         width: 1100, height: 700, pointerEvents: 'none', zIndex: 0,
         background: theme === 'light'
           ? 'radial-gradient(ellipse at center, rgba(212,168,75,0.18) 0%, rgba(182,141,64,0.05) 40%, transparent 70%)'
           : 'radial-gradient(ellipse at center, rgba(212,168,75,0.22) 0%, rgba(182,141,64,0.07) 38%, transparent 70%)',
       }}/>
-      <div style={{
+      <div suppressHydrationWarning style={{
         position: 'absolute', inset: 0, opacity: theme === 'light' ? 0.35 : 0.5,
         backgroundImage: theme === 'light'
           ? 'radial-gradient(circle, rgba(78,69,56,0.1) 1px, transparent 1px)'

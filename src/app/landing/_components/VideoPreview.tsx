@@ -51,21 +51,13 @@ export function VideoPreview() {
               </div>
             </>
           ) : (
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--sand)', fontFamily: 'var(--font-ibm)', fontSize: 13,
-            }}>
-              <span style={{ textAlign: 'center', padding: '0 20px' }}>
-                {t.video.placeholder}<br/>
-                <button onClick={e => { e.stopPropagation(); setPlaying(false) }}
-                  style={{
-                    marginTop: 12, padding: '6px 14px', borderRadius: 9999,
-                    background: 'var(--surface-2)', border: '1px solid var(--border)',
-                    color: 'var(--sand)', fontFamily: 'var(--font-ibm)', fontSize: 11, cursor: 'pointer',
-                  }}>{t.video.reset}</button>
-              </span>
-            </div>
+            <video
+              src="/PromoSnappy.mp4"
+              autoPlay
+              muted
+              controls
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           )}
         </div>
       </div>
