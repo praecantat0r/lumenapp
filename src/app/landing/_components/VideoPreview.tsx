@@ -4,7 +4,7 @@ import { useT } from './LangContext'
 import { useBreakpoint } from './useBreakpoint'
 
 export function VideoPreview() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const { isMobile } = useBreakpoint()
   const [playing, setPlaying] = useState(false)
 
@@ -52,7 +52,7 @@ export function VideoPreview() {
             </>
           ) : (
             <video
-              src="/PromoSnappy.mp4"
+              src={lang === 'sk' ? '/PromoSnappy.mp4' : '/PromoSnappyEN.mp4'}
               autoPlay
               muted
               controls
