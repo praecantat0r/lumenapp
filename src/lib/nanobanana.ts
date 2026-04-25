@@ -18,30 +18,40 @@ async function callGemini(
   model: string,
   parts: unknown[]
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
-  const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: {
-        // Both TEXT and IMAGE are required — sole "IMAGE" is rejected by
-        // several model variants.
-        responseModalities: ['TEXT', 'IMAGE'],
-        imageConfig: {
-          aspectRatio: '4:5',
-          imageSize: '1K',
-        },
+    const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 90_000) // 90s per attempt
+  try {
+    const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
       },
-    }),
-  })
-  const data = await res.json()
-  return { ok: res.ok, status: res.status, data }
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          // Both TEXT and IMAGE are required — sole "IMAGE" is rejected by
+          // several model variants.
+          responseModalities: ['TEXT', 'IMAGE'],
+          imageConfig: {
+            aspectRatio: '4:5',
+            imageSize: '1K',
+          },
+        },
+      }),
+      signal: controller.signal,
+    })
+    const data = await res.json()
+    return { ok: res.ok, status: res.status, data }
+  } catch (err: unknown) {
+    const isAbort = err instanceof Error && err.name === 'AbortError'
+    return { ok: false, status: isAbort ? 408 : 500, data: { error: isAbort ? 'Request timeout' : String(err) } }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
-type ImagePart = { inline_data: { mime_type: string; data: string } }
+export type ImagePart = { inline_data: { mime_type: string; data: string } }
 
 // Fetch, resize, and encode reference images in parallel.
 // Exported so callers can prefetch images concurrently with prompt generation.

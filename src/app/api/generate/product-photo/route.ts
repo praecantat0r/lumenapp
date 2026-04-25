@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createClient } from '@/lib/supabase/server'
 import { analyzeLocationPhoto, analyzeProductAsset, generateProductPhotoPrompt, type AssetGuidance } from '@/lib/anthropic'
 import { generateImage, prefetchReferenceImages } from '@/lib/nanobanana'
@@ -57,8 +58,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create record' }, { status: 500 })
   }
 
-  // Run generation async — return photo_id immediately for polling
-  ;(async () => {
+  // Run generation in background — waitUntil keeps the Vercel function alive after response is sent
+  waitUntil((async () => {
     try {
       // Analyze assets in parallel — vision analysis runs alongside each other
       const [locationDescription, productPhysicalDescription, productPhysicalDescriptionComposite] =
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
         .update({ status: 'failed' })
         .eq('id', photo.id)
     }
-  })()
+  })())
 
   return NextResponse.json({ photo_id: photo.id })
 }

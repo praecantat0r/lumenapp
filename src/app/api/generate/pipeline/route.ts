@@ -6,7 +6,7 @@ export const maxDuration = 300
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateCaption, generateOriginalImagePrompt, generateAssetImagePrompt, generateCompositeImagePrompt, validatePost, analyzeLocationPhoto, type AssetGuidance } from '@/lib/anthropic'
 import { buildBrandContext } from '@/lib/context-builder'
-import { generateImage } from '@/lib/nanobanana'
+import { generateImage, prefetchReferenceImages, type ImagePart } from '@/lib/nanobanana'
 import { renderPostServer, seedUserDefaultTemplate, SEED_CANVAS_JSON } from '@/lib/renderer'
 import type { BrandBrain } from '@/types'
 
