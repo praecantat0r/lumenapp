@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 
 function parseSignedRequest(signedRequest: string, secret: string) {
   const [encodedSig, payload] = signedRequest.split('.')
@@ -10,8 +10,6 @@ function parseSignedRequest(signedRequest: string, secret: string) {
   return JSON.parse(Buffer.from(payload, 'base64').toString('utf8'))
 }
 
-// Called by Meta when a user removes Lumen from their Instagram connected-apps settings.
-// This differs from data-deletion: we only revoke the connection, not all user data.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.formData()
@@ -21,18 +19,18 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parseSignedRequest(signedRequest, process.env.INSTAGRAM_APP_SECRET!)
-    const instagramUserId: string = data.user_id ?? data.user?.id
+    const facebookUserId: string = data.user?.id
 
-    if (instagramUserId) {
-      const supabase = await createClient()
+    if (facebookUserId) {
+      const supabase = createServiceClient()
       await supabase
         .from('instagram_connections')
-        .delete()
-        .eq('instagram_user_id', instagramUserId)
+        .update({ access_token: null, token_expires_at: null })
+        .eq('instagram_user_id', facebookUserId)
     }
 
     return new NextResponse(null, { status: 200 })
   } catch {
-    return NextResponse.json({ error: 'Processing failed' }, { status: 400 })
+    return new NextResponse(null, { status: 200 })
   }
 }
