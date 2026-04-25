@@ -1,21 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { encryptToken } from '@/lib/token-crypto'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const rawState = searchParams.get('state') || ''
-  const [userId, from] = rawState.split('|')
+  const [stateNonce, from = 'settings'] = rawState.split('|')
   const error = searchParams.get('error')
 
   const errorRedirect = from === 'onboarding'
     ? '/dashboard/overview?ig_error=1'
     : '/dashboard/brand-brain?tab=settings&ig_error=1'
 
-  if (error || !code || !userId) {
+  // Verify CSRF nonce
+  const cookieNonce = req.cookies.get('ig_oauth_nonce')?.value
+  if (error || !code || !stateNonce || !cookieNonce || stateNonce !== cookieNonce) {
     return NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
   }
+
+  // Get userId from the authenticated session, not from state
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
+  }
+  const userId = user.id
 
   try {
     // Exchange code for short-lived token
@@ -67,16 +77,20 @@ export async function GET(req: NextRequest) {
       user_id: userId,
       instagram_user_id: igUserId,
       username,
-      access_token: longLivedToken,
+      access_token: encryptToken(longLivedToken),
       token_expires_at: expiresAt,
     }, { onConflict: 'user_id' })
 
     const successRedirect = from === 'onboarding'
       ? '/dashboard/overview?ig_connected=1'
       : '/dashboard/brand-brain?tab=settings&ig_connected=1'
-    return NextResponse.redirect(new URL(successRedirect, process.env.NEXT_PUBLIC_APP_URL!))
+    const res = NextResponse.redirect(new URL(successRedirect, process.env.NEXT_PUBLIC_APP_URL!))
+    res.cookies.delete('ig_oauth_nonce')
+    return res
   } catch (err) {
     console.error('IG callback error:', err)
-    return NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
+    const res = NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
+    res.cookies.delete('ig_oauth_nonce')
+    return res
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { randomUUID } from 'crypto'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -10,7 +11,9 @@ export async function GET(req: NextRequest) {
   if (!rateLimit(`ig-auth:${user.id}`, 10, 60_000)) return rateLimitResponse()
 
   const from = new URL(req.url).searchParams.get('from') || 'settings'
-  const state = `${user.id}|${from}`
+  const nonce = randomUUID()
+  // State carries only the nonce and `from`; userId comes from the Supabase session on callback
+  const state = `${nonce}|${from}`
 
   const authUrl = `https://www.instagram.com/oauth/authorize?` +
     `client_id=${process.env.INSTAGRAM_APP_ID}` +
@@ -19,5 +22,14 @@ export async function GET(req: NextRequest) {
     `&response_type=code` +
     `&state=${encodeURIComponent(state)}`
 
-  return NextResponse.redirect(authUrl)
+  const res = NextResponse.redirect(authUrl)
+  // Short-lived CSRF nonce — verified in the callback before processing
+  res.cookies.set('ig_oauth_nonce', nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 300, // 5 minutes
+    path: '/',
+  })
+  return res
 }

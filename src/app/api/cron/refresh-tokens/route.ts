@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { refreshInstagramToken } from '@/lib/instagram'
 import { rateLimit } from '@/lib/rate-limit'
+import { decryptToken, encryptToken } from '@/lib/token-crypto'
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
@@ -26,10 +27,10 @@ export async function GET(req: NextRequest) {
   let refreshed = 0
   for (const conn of connections) {
     try {
-      const { access_token, expires_in } = await refreshInstagramToken(conn.access_token)
+      const { access_token, expires_in } = await refreshInstagramToken(decryptToken(conn.access_token))
       const newExpiry = new Date(Date.now() + expires_in * 1000).toISOString()
       await supabase.from('instagram_connections').update({
-        access_token,
+        access_token: encryptToken(access_token),
         token_expires_at: newExpiry,
       }).eq('id', conn.id)
       refreshed++
