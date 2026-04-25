@@ -25,7 +25,10 @@ export function VideoPreview() {
         }}>
           <video
             ref={videoRef}
-            src={lang === 'sk' ? '/PromoSnappy.mp4' : '/PromoSnappyEN.mp4'}
+            src={lang === 'sk'
+              ? 'https://uwhlwsbssdphtpcbxeuy.supabase.co/storage/v1/object/public/brand-assets/landing/PromoSnappy.mp4'
+              : 'https://uwhlwsbssdphtpcbxeuy.supabase.co/storage/v1/object/public/brand-assets/landing/PromoSnappyEN.mp4'
+            }
             controls
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
           />

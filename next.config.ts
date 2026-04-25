@@ -16,7 +16,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: https://*.supabase.co https://api.templated.io",
       "font-src 'self' https://fonts.gstatic.com",
-      "media-src 'self'",
+      "media-src 'self' https://*.supabase.co",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://api.openai.com https://api.templated.io",
       "frame-ancestors 'none'",
     ].join('; '),
