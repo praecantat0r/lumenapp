@@ -10,6 +10,10 @@ function parseSignedRequest(signedRequest: string, secret: string) {
   return JSON.parse(Buffer.from(payload, 'base64').toString('utf8'))
 }
 
+export function GET() {
+  return new NextResponse(null, { status: 200 })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.formData()
