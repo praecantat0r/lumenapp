@@ -43,6 +43,7 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
     { href: '/dashboard/posts',              label: t('nav.posts'),             icon: 'calendar_view_month', badge: pendingCount > 0 ? pendingCount : null },
     { href: '/dashboard/product-photos',     label: t('nav.productPhotos'),     icon: 'camera_enhance' },
     { href: '/dashboard/caption-generator',  label: t('nav.captionGenerator'),  icon: 'auto_awesome' },
+    { href: '/dashboard/editor',             label: t('nav.editor'),            icon: 'edit_square' },
     { href: '/dashboard/templates',          label: t('nav.templates'),         icon: 'grid_view' },
     { href: '/dashboard/statistics',         label: t('nav.analytics'),         icon: 'monitoring' },
     { href: '/dashboard/brand-brain',        label: t('nav.brandBrain'),        icon: 'psychology' },

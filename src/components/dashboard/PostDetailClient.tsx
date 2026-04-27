@@ -185,6 +185,19 @@ export function PostDetailClient({ post: initialPost }: { post: Post }) {
           >
             Edit in Designer
           </button>
+          {post.render_url && (
+            <a
+              href={post.render_url}
+              download={`post-${post.id}.jpg`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display:'block', width:'100%', marginTop:10, background:'transparent', border:'1px solid #2D2A1F', color:'var(--muted)', padding:'9px 0', fontFamily:'var(--font-syne)', fontWeight:700, fontSize:11, letterSpacing:'.06em', textTransform:'uppercase', cursor:'pointer', borderRadius:8, transition:'border-color .15s, color .15s', textAlign:'center', textDecoration:'none' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor='rgba(212,168,75,.4)'; e.currentTarget.style.color='var(--parchment)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--muted)' }}
+            >
+              Download Image
+            </a>
+          )}
         </div>
 
         {/* Right: details */}
@@ -221,6 +234,15 @@ export function PostDetailClient({ post: initialPost }: { post: Post }) {
 
           {/* Actions */}
           <div style={{ padding:'16px 22px', borderBottom:'1px solid #2D2A1F', display:'flex', gap:8 }}>
+            <button
+              onClick={() => saveCaption(caption, hashtags)}
+              disabled={saveState === 'saving'}
+              style={{ flex:1, background: saveState === 'saved' ? 'rgba(110,191,139,0.08)' : 'transparent', border: saveState === 'saved' ? '1px solid rgba(110,191,139,0.35)' : '1px solid #2D2A1F', color: saveState === 'saved' ? '#6EBF8B' : 'var(--sand)', padding:'10px 12px', fontFamily:'var(--font-syne)', fontWeight:700, fontSize:11, letterSpacing:'.02em', textTransform:'uppercase', cursor: saveState === 'saving' ? 'default' : 'pointer', borderRadius:8, transition:'border-color .15s, color .15s, background .15s' }}
+              onMouseEnter={e => { if (saveState !== 'saving' && saveState !== 'saved') { e.currentTarget.style.borderColor='rgba(212,168,75,.4)'; e.currentTarget.style.color='var(--parchment)' } }}
+              onMouseLeave={e => { if (saveState !== 'saving' && saveState !== 'saved') { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--sand)' } }}
+            >
+              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? '✓ Saved' : 'Save'}
+            </button>
             {post.status === 'pending_review' && (
               <button
                 onClick={approve}
