@@ -3,7 +3,7 @@ export interface Profile {
   email: string
   full_name?: string
   avatar_url?: string
-  plan: 'free' | 'pro' | 'agency'
+  plan: 'free' | 'starter' | 'growth' | 'agency' | 'pro'
   created_at: string
   updated_at: string
 }

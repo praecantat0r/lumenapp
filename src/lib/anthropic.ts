@@ -386,8 +386,190 @@ const SHOT_STYLES = [
   },
 ]
 
-function buildShotStyleDirective(): string {
-  const s = SHOT_STYLES[Math.floor(Math.random() * SHOT_STYLES.length)]
+type IndustryCategory =
+  | 'food_beverage'
+  | 'nature_agriculture'
+  | 'tech_software'
+  | 'product_retail'
+  | 'beauty_wellness'
+  | 'fashion_lifestyle'
+  | 'fitness_sport'
+  | 'hospitality'
+  | 'professional_services'
+  | 'general'
+
+const INDUSTRY_KEYWORDS: Array<[IndustryCategory, string[]]> = [
+  ['food_beverage',         ['coffee', 'café', 'cafe', 'bakery', 'restaurant', 'food', 'drink', 'beverage', 'bar', 'tea', 'wine', 'beer', 'gastro', 'culinary', 'pastry', 'catering', 'bistro', 'confection', 'chocolat']],
+  ['nature_agriculture',    ['bee', 'honey', 'včel', 'med', 'farm', 'garden', 'herb', 'flower', 'plant', 'organic', 'eco', 'nature', 'apiary', 'botanical', 'harvest', 'agriculture', 'forager', 'beekeep', 'vcelnic', 'včelár']],
+  ['tech_software',         ['tech', 'software', 'saas', 'app', 'digital', 'platform', 'startup', 'developer', 'data', 'cloud', 'code', 'web', 'fintech', 'martech', 'devops', 'cybersec', 'blockchain', 'ai ', 'it ']],
+  ['product_retail',        ['shop', 'store', 'retail', 'ecommerce', 'goods', 'packaging', 'merch', 'accessories', 'jewel', 'watch', 'luxury goods', 'candle', 'souvenir', 'stationery', 'gift']],
+  ['beauty_wellness',       ['beauty', 'skincare', 'cosmetic', 'spa', 'wellness', 'salon', 'nail', 'makeup', 'fragrance', 'perfume', 'body', 'hair', 'serum', 'moistur', 'esthetic', 'estetik']],
+  ['fashion_lifestyle',     ['fashion', 'clothing', 'apparel', 'wear', 'style', 'boutique', 'knitwear', 'textile', 'leather', 'fabric', 'atelier', 'couture', 'menswear', 'womenswear', 'odev', 'oblečen']],
+  ['fitness_sport',         ['fitness', 'gym', 'sport', 'training', 'yoga', 'pilates', 'crossfit', 'cycle', 'run', 'hike', 'athletic', 'martial', 'climb', 'trening', 'šport']],
+  ['hospitality',           ['hotel', 'hostel', 'resort', 'event', 'venue', 'wedding', 'travel', 'tourism', 'airbnb', 'accommodation', 'retreat', 'svadba', 'ubytovan']],
+  ['professional_services', ['consult', 'finance', 'law', 'legal', 'insurance', 'agency', 'hr', 'accountant', 'architect', 'medical', 'clinic', 'therapy', 'coaching', 'audit', 'advisory', 'klinika', 'advokát']],
+]
+
+function classifyIndustry(industry: string): IndustryCategory {
+  const lower = industry.toLowerCase()
+  for (const [category, keywords] of INDUSTRY_KEYWORDS) {
+    if (keywords.some(k => lower.includes(k))) return category
+  }
+  return 'general'
+}
+
+const INDUSTRY_SHOT_STYLE_WEIGHTS: Record<IndustryCategory, number[]> = {
+  food_beverage:         [2, 3, 4],
+  nature_agriculture:    [3, 4, 1],
+  tech_software:         [0, 6, 5],
+  product_retail:        [0, 6, 5, 3],
+  beauty_wellness:       [0, 2, 3],
+  fashion_lifestyle:     [6, 4, 1],
+  fitness_sport:         [1, 6, 5],
+  hospitality:           [4, 5, 0],
+  professional_services: [0, 6],
+  general:               [0, 1, 2, 3, 4, 5, 6],
+}
+
+const INDUSTRY_PHOTOGRAPHY_GUIDES: Record<IndustryCategory, string> = {
+  food_beverage: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Food & Beverage
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must feel sensory, warm, and crafted — every image should make the viewer want to taste or smell the scene.
+VISUAL VOCABULARY: Steam rising from cups, ingredients mid-pour or mid-drizzle, textured surfaces (linen, wood, stone), artisan hands at work, fresh produce, beautifully plated dishes, glass and ceramic vessels showing depth.
+LIGHTING: Warm window light from the side (golden-hour quality), candlelight ambiance for evening scenes, soft overcast for flat lays. Always warm color temperature — never cool or clinical.
+COLOR PALETTE: Deep espresso brown, warm cream, muted sage, terracotta, burnt sienna, honey gold, soft olive. Rich and appetising.
+COMPOSITION MOOD: Intimate and sensory. Close-to-subject framing reveals texture and warmth. The viewer should feel they are in the scene.
+AVOID: Harsh studio strobes, cold clinical backgrounds, geometric minimalism, floating-in-void product shots, abstract digital elements.`,
+
+  nature_agriculture: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Nature & Agriculture
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must meet the standard of professional nature and wildlife macro photography — alive, earthy, and intimate. Every image must feel discovered in the field, never staged in a studio.
+
+SUBJECT QUALITY — CRITICAL: When the subject is a bee, insect, or any biological creature, render it with full photorealistic anatomical precision: visible fine body setae (fur on thorax and abdomen), defined compound multi-faceted eyes showing individual facets, transparent wing venation clearly articulated, natural legs gripping the surface with individual tarsal segments visible, distinct yellow-and-black banding. The subject must be close enough that this level of detail is readable — it must fill at least 50% of the frame height. A blurry bee, a small bee, or a bee that looks painted or plastic is an absolute failure.
+
+FRAMING STANDARD — CRITICAL: Tight macro or close lifestyle framing ONLY. The subject must occupy 50–80% of the frame. Wide environmental shots are forbidden when the subject is a bee, flower, or piece of honeycomb — the camera must be close enough to reveal living texture. Never shoot the subject as a small object in a large scene.
+
+NATURAL CONTEXT — CRITICAL (most common failure mode): Natural subjects must appear IN their actual environment — never extracted and placed on an artificial surface. Specifically:
+— A bee belongs on a real wildflower or on an actual wooden honeycomb frame inside a hive. NEVER on a flat pale surface, white surface, grey surface, hive lid, or table.
+— Honeycomb must appear as part of a hive frame actively being worked, or backlit by golden sunlight in a beekeeper's hands — NEVER as an isolated rectangular slab sitting on a counter, table, box lid, or any flat horizontal surface. This is the single most common failure — do not generate honeycomb as a prop placed on a surface.
+— If honey is featured, it must drizzle naturally from a dipper, comb, or frame — not pour artificially from nothing.
+
+VISUAL VOCABULARY: Bee in extreme close-up on a wildflower with pollen-dusted stamens, golden honey drizzling from a frame held in natural light, beekeeper's gloved hands working a full wooden hive frame outdoors, wildflower meadow with soft golden bokeh, glass jar of amber honey backlit by sunlight on a wooden surface, morning mist over an orchard at dawn.
+
+LIGHTING: Warm golden hour (late afternoon sun filtering through leaves), dappled natural light, soft overcast diffusion, or natural backlight with a gentle lens flare. The light must feel like it belongs outdoors. NEVER studio strobes, ring lights, neon, or any artificial clinical lighting.
+
+COLOR PALETTE: Warm amber, honey gold, earthy bark brown, forest green, wild cream, wildflower violet, sun-bleached wood, deep shadow-green. Rich, warm, and entirely organic — absolutely no cool grays, no pale artificial whites, no digital blues.
+
+COMPOSITION MOOD: Intimate and discovered. The image must feel like a moment caught in nature by a skilled macro photographer — not assembled or composited. Prefer close angles that reveal living texture and natural detail.
+
+AVOID: Any pale, white, or grey flat surface under a natural subject. Isolated honeycomb slabs placed on surfaces as props. Bees or insects that are small background details. Wide shots where the main subject occupies less than 30% of the frame. Composite-feeling placements. Abstract or geometric elements. Studio or artificial lighting. Cold-toned or futuristic aesthetics. Digital gradients.
+
+PRODUCT & COMPOSITE PHOTOGRAPHY AESTHETIC — THE DEFINITIVE LOOK FOR THIS BRAND:
+When a honey jar, mead bottle, or any branded product is the hero placed in or near the outdoor apiary/nature environment, the aesthetic is: warm golden afternoon sunlight, bright and alive, never dark or studio-lit.
+
+LIGHTING: Late afternoon golden hour sun coming from the side-rear at roughly 45°, wrapping warm amber light around the product. For glass bottles and jars: the sunlight must pass through the liquid, creating a glowing internal luminosity — the amber honey or mead liquid should appear lit from within, radiating warm gold. The overall exposure is bright and warm — correctly exposed for beautiful outdoor sunlight, not underexposed for drama. Think: a perfect golden afternoon at the apiary, sun low and warm.
+
+ATMOSPHERE — MANDATORY: Fine floating particles — dust motes, pollen, or light scatter — must be visible drifting through the sunbeams around the product. These make the scene feel alive and are a non-negotiable signature of this aesthetic. They must always be present.
+
+SURFACE: A natural sun-warmed wooden surface — planks, a railing, a rustic bench or log section. Natural warm wood tones with visible grain. Sunlight creates a warm glow on the surface texture around the product. The surface should feel warm and tactile, never dark or cold.
+
+BACKGROUND: Soft bokeh at f/2.8 equivalent — the outdoor environment (beehive structure, foliage, trees) remains present and recognizable as warm, soft, colorful blur. The background provides natural context and warmth. Do NOT dissolve it into pure darkness — it should read as a sun-dappled outdoor apiary, just beautifully out of focus.
+
+COLOR GRADE: Warm honey-amber and golden tones dominate. Sunlit wood browns, soft green foliage bokeh, warm cream sky. The image should feel like the warmest, most golden afternoon of summer. No cool tones, no dark moody shadows, no underexposure.
+
+DO NOT use dark studio lighting, artificial backlighting rigs, underglow, or any dramatic low-key setup. The natural golden sunlight is the only light source needed — it provides all the warmth and drama.`,
+
+  tech_software: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Tech & Software
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must feel precise, modern, and intelligent — clean without being cold, sharp without being sterile.
+VISUAL VOCABULARY: Sleek laptops and devices, clean minimal desk environments, soft glowing screens, abstract data rendered as light, minimal workspaces with one strong design object, confident hands on keyboards, architectural negative space.
+LIGHTING: Clean soft-box studio light, crisp directional key with subtle fill, cool-neutral or slightly warm white balance. Controlled and deliberate.
+COLOR PALETTE: Clean white, warm slate gray, electric blue or indigo accent, dark charcoal, brushed silver. One vivid brand accent on a minimal neutral base.
+COMPOSITION MOOD: Precise, confident, and airy. Strong negative space. The subject commands the frame.
+AVOID: Warm rustic textures, natural outdoor settings, anything handcrafted or artisan-feeling, clutter, warm earth tones.`,
+
+  product_retail: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Product & Retail
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must make the product irresistible — every detail of its construction, material, and finish must read clearly and beautifully.
+VISUAL VOCABULARY: Product as the sole hero, premium surfaces (stone, wood, marble, matte black), minimal supporting props that reinforce the product's world, architectural shadows that reveal form, textures that invite touch.
+LIGHTING: Strong purposeful key light that sculpts the product's form, subtle fill to preserve shadow detail, optional rim light. Every surface — gloss, matte, metal, glass — rendered with photographic precision.
+COLOR PALETTE: Draw from the product itself. Background palette should contrast or complement, never compete.
+COMPOSITION MOOD: Premium and deliberate. The product is architecture — give it space to breathe and command attention.
+AVOID: Cluttered backgrounds, competing props, generic white-box shots without atmosphere, lighting that flattens material qualities.`,
+
+  beauty_wellness: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Beauty & Wellness
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must feel clean, serene, and aspirational — a visual promise of transformation and care.
+VISUAL VOCABULARY: Serums and bottles on marble or stone, botanical ingredients (petals, herbs, oils) arranged with intent, spa environments with soft towels, clean skin close-ups, morning light on a vanity, fresh botanicals.
+LIGHTING: Soft diffused light (large window or beauty dish), gentle fill, no harsh shadows. Slightly warm-neutral white balance; cool and clean for clinical skincare.
+COLOR PALETTE: Soft white, blush pink, sage green, champagne gold, pearl, eucalyptus, light stone. Delicate, refined, and soothing.
+COMPOSITION MOOD: Calm, refined, and intentional. Every element placed with care. Generous negative space.
+AVOID: Dark dramatic shadows, bold high-contrast looks, rustic or rough textures, anything chaotic or unsettled.`,
+
+  fashion_lifestyle: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Fashion & Lifestyle
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must feel editorial, aspirational, and emotionally resonant — a world the viewer wants to inhabit.
+VISUAL VOCABULARY: Garments in motion or carefully draped, close-ups of fabric texture and stitching, people in aspirational settings (streets, interiors, nature), accessories as sculptural objects, lifestyle moments communicating a way of living.
+LIGHTING: Golden hour editorial light outdoors, or controlled studio fashion lighting (strong directional, dramatic shadows). Light must flatter the garment's fabric and silhouette.
+COLOR PALETTE: Determined by the collection or garment. Support with neutrals — stone, cream, charcoal — and let the garment's color be the accent.
+COMPOSITION MOOD: Confident and considered. Every frame should feel like it belongs in a magazine.
+AVOID: Generic stock-photo aesthetics, flat lighting, tourist-style framing, overly casual composition.`,
+
+  fitness_sport: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Fitness & Sport
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must feel energetic, dynamic, and motivating — the image itself should feel like it's in motion.
+VISUAL VOCABULARY: Athletic equipment in dramatic light, outdoor training environments, motion suggesting speed or power, strong low angles that make subjects look powerful, early-morning or golden-hour outdoor scenes.
+LIGHTING: High contrast, dramatic — strong directional key with deep shadows. Outdoor: golden hour or midday sun. Indoor: gym's ambient with purposeful supplement. Bold and unapologetic.
+COLOR PALETTE: Dark charcoal, bold brand accent (often red, electric blue, or orange), black, metallic silver. High energy — avoid muted pastels.
+COMPOSITION MOOD: Powerful, dynamic, and aspirational. Low angles make subjects commanding. Strong diagonals create tension and energy.
+AVOID: Soft pastel aesthetics, gentle warm lifestyle, flat overhead shots, anything calm or serene.`,
+
+  hospitality: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Hospitality & Events
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must feel welcoming, atmospheric, and luxuriously comfortable — the promise of an experience.
+VISUAL VOCABULARY: Beautifully lit interiors with architectural character, table settings with ambient candles or flowers, outdoor terraces at golden hour, spa environments, inviting bed linen or seating details, service moments.
+LIGHTING: Warm ambient interior lighting (candles, pendant lamps), golden hour windows, soft dusk light. The scene should always feel like a place you want to stay in.
+COLOR PALETTE: Warm cream, deep navy, terracotta, brushed gold, stone, linen, dark walnut. Sophisticated and warm.
+COMPOSITION MOOD: Atmospheric and inviting. The viewer should feel transported into the space.
+AVOID: Cold clinical lighting, harsh white backgrounds, generic exterior shots without atmosphere, anything impersonal.`,
+
+  professional_services: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE — Professional Services
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your photography must feel credible, authoritative, and quietly confident — trust communicated through restraint.
+VISUAL VOCABULARY: Minimal premium desk surfaces, architectural office environments with clean lines, purposeful objects (a single pen, open notebook, coffee beside a laptop), confident professional compositions with strong negative space.
+LIGHTING: Clean controlled studio light, or crisp window light in a modern environment. Balanced, neutral white balance.
+COLOR PALETTE: Dark navy, warm gray, clean white, slate, one restrained accent (deep green, burgundy, or gold). Conservative and premium.
+COMPOSITION MOOD: Authoritative, precise, and trustworthy. Minimal. Every element earns its place.
+AVOID: Warm rustic aesthetics, chaotic compositions, overly playful colors, anything that undermines professionalism.`,
+
+  general: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INDUSTRY PHOTOGRAPHY GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Apply a photography style that feels native to this brand's world — not generic. Let the brand's tone keywords guide every visual decision: warm vs. cool, minimal vs. rich, editorial vs. authentic.`,
+}
+
+function buildIndustryPhotographyGuide(category: IndustryCategory): string {
+  return INDUSTRY_PHOTOGRAPHY_GUIDES[category]
+}
+
+function buildShotStyleDirective(category: IndustryCategory = 'general'): string {
+  const preferred = INDUSTRY_SHOT_STYLE_WEIGHTS[category]
+  let idx: number
+  if (preferred.length < 7 && Math.random() < 0.70) {
+    idx = preferred[Math.floor(Math.random() * preferred.length)]
+  } else {
+    idx = Math.floor(Math.random() * SHOT_STYLES.length)
+  }
+  const s = SHOT_STYLES[idx]
   return `SHOT STYLE FOR THIS IMAGE — apply this exactly:
 Camera angle: ${s.angle}
 Lens & aperture: ${s.lens}
@@ -490,6 +672,7 @@ export async function generateOriginalImagePrompt(
   feedback?: string,
   postMode: 'topics' | 'services' = 'topics'
 ): Promise<AgentOutput> {
+  const category = classifyIndustry(brandBrain.industry ?? '')
   const avoidSection = recentImagePrompts.length > 0
     ? `\nRECENTLY USED IMAGE CONCEPTS — you MUST choose a completely different concept, subject, setting, and visual style from all of these:\n${recentImagePrompts.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n`
     : ''
@@ -542,31 +725,32 @@ BRAND CONTEXT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${getBrandProfile(brandBrain)}
 ${contextSection}${avoidSection}
+${buildIndustryPhotographyGuide(category)}
 Your task: Generate three things for an Instagram ad post.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. IMAGE_PROMPT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Write a single long-form, highly detailed image generation prompt as flowing descriptive prose (not bullet points), covering every layer of the scene with precision and sensory richness. Structure the description in this exact order:
+Write a single long-form, highly detailed image generation prompt as flowing descriptive prose (not bullet points), covering every layer of the scene with precision and sensory richness. The INDUSTRY PHOTOGRAPHY GUIDE above defines the visual world you must work within — apply its lighting, color palette, and vocabulary faithfully. Structure the description in this exact order:
 
 ① SUBJECT — Describe the main subject clearly: what it is, its key visual features, material, color. Keep it grounded.
 ${buildPeopleRule(brandBrain)}
 
 ② COMPOSITION & POSITIONING — How the subject sits in the frame: position, angle, camera height. Portrait/vertical 4:5 orientation.
 
-③ PROPS & ENVIRONMENT — Maximum 1–2 props. A prop is only allowed if explicitly named or clearly implied by the brand's Products/Services or Post Topics above. Empty is better than invented. NEVER add water droplets, floating orbs, or abstract decorative elements unless the product is literally a liquid or beverage.
+③ PROPS & ENVIRONMENT — Maximum 1–2 props. A prop is only allowed if explicitly named or clearly implied by the brand's Products/Services or Post Topics above, AND fits the industry vocabulary defined above. Empty is better than invented. NEVER add water droplets, floating orbs, or abstract decorative elements unless the product is literally a liquid or beverage.
 
-④ BACKGROUND — A real location, simple gradient, or natural setting that fits the brand's tone. Name colors specifically.
+④ BACKGROUND — A real location, simple gradient, or natural setting matching the industry guide above. Name colors specifically.
 
-⑤ LIGHTING — Direction, quality (soft/hard), temperature (warm/cool), and main effect on the subject.
+⑤ LIGHTING — Follow the lighting character defined in the industry guide above. Specify direction, quality (soft/hard), temperature (warm/cool), and main effect on the subject.
 
-⑥ COLOR PALETTE — 3–5 dominant colors. Name them specifically.
+⑥ COLOR PALETTE — 3–5 dominant colors drawn from the industry palette above. Name them specifically.
 
-⑦ MOOD & ATMOSPHERE — 2 evocative terms matching the brand's tone and post purpose.
+⑦ MOOD & ATMOSPHERE — 2 evocative terms matching the brand's tone and the industry guide above.
 
-⑧ ART STYLE — Photorealistic photography style fitting the brand's industry and tone.
+⑧ ART STYLE — Photorealistic photography style fitting the industry guide above.
 
-⑨ ${buildShotStyleDirective()}
+⑨ ${buildShotStyleDirective(category)}
 End with: "ultra-high resolution, no text, no words, no labels, no logos, no underglow, no neon ground lighting, no light strips beneath objects, no props unrelated to the scene subject."
 
 Write as one cohesive paragraph of clear prose. Aim for 150–250 words. Less is more.
@@ -600,6 +784,7 @@ export async function generateAssetImagePrompt(
   feedback?: string,
   postMode: 'topics' | 'services' = 'topics'
 ): Promise<AgentOutput> {
+  const category = classifyIndustry(brandBrain.industry ?? '')
   const avoidSection = recentImagePrompts.length > 0
     ? `\nRECENTLY USED IMAGE CONCEPTS — you MUST choose a completely different concept, subject, setting, and visual style from all of these:\n${recentImagePrompts.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n`
     : ''
@@ -725,6 +910,7 @@ BRAND CONTEXT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${getBrandProfile(brandBrain)}
 ${contextSection}${avoidSection}${assetSection}
+${buildIndustryPhotographyGuide(category)}
 Your task: Generate three things for an Instagram ad post.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -751,7 +937,7 @@ ${buildPeopleRule(brandBrain)}
 
 ⑨ ${assetGuidance.type === 'place_photo' || assetGuidance.type === 'photo'
   ? 'CAMERA ANGLE & PERSPECTIVE — Match the camera angle, height, and framing of the reference photo. The shot must feel like it was taken from within the same environment, not from above or as a flat lay.'
-  : buildShotStyleDirective()}
+  : buildShotStyleDirective(category)}
 End with the mandatory closing line specified in the asset instructions above.
 
 One cohesive paragraph, 150–250 words.
@@ -783,6 +969,7 @@ export async function generateCompositeImagePrompt(
   assetGuidance: AssetGuidance,
   feedback?: string
 ): Promise<AgentOutput> {
+  const category = classifyIndustry(brandBrain.industry ?? '')
   const prompt = `You are a world-class commercial photographer and creative director specializing in luxury product advertising. You are creating an image generation brief for the brand "${sanitizeForPrompt(brandBrain.brand_name, 200)}".
 
 BRAND: ${sanitizeForPrompt(brandBrain.brand_name, 200)}
@@ -790,6 +977,7 @@ Products: ${sanitizeForPrompt(brandBrain.products)}
 Tone: ${brandBrain.tone_keywords?.map(k => sanitizeForPrompt(k, 100)).join(', ')}
 Language: ${sanitizeForPrompt(brandBrain.language, 100)}
 ${brandBrain.post_avoid ? `Never reference: ${sanitizeForPrompt(brandBrain.post_avoid)}\n` : ''}${buildPromoDirective(brandBrain)}
+${buildIndustryPhotographyGuide(category)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COMPOSITE BRIEF
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -813,11 +1001,13 @@ After that mandatory opening, write a single flowing paragraph of rich, cinemati
 
 CREATIVE DIRECTION — read this first: Study both reference images and choose the lighting style, mood, and atmosphere that would make the most visually striking and commercially compelling advertisement for this specific product in this specific environment. Do not default to any one style — let the combination of scene and product guide you. A bright outdoor terrace calls for a different treatment than a dark industrial space; a glass bottle calls for different lighting than a matte cardboard package. Choose deliberately and describe your choice with full conviction.
 
+INDUSTRY GUIDE PRIORITY: The INDUSTRY PHOTOGRAPHY GUIDE at the top of this brief defines the aesthetic for this brand's category — read it before making any lighting or mood decision. If it specifies a warm golden outdoor look, lean into the scene's natural sunlight quality rather than inventing artificial drama. The guide takes precedence over generic cinematic defaults.
+
 PRODUCT PLACEMENT: The exact product from reference image 1 — reproduced faithfully at its actual scale and form — positioned in the foreground using rule of thirds. Dominant, slightly off-center. Choose the angle that makes it look most compelling: 3/4 rotation, straight-on, or low-angle — whichever reveals its true shape and character best. The product occupies 45–65% of the frame height.
 
 SURFACE & GROUNDING: Choose the most visually compelling solid surface present in reference image 2 — prioritize horizontal surfaces with texture and character: a wooden plank, stone slab, shelf ledge, or countertop. Avoid bare ground, dirt, or gravel. The product MUST physically rest on this surface with full contact — no gap between base and surface. The surface texture must visibly continue beneath the product's base. Render a soft contact shadow at the base perimeter that confirms physical weight.
 
-LIGHTING: Design a complete cinematic lighting setup that draws its color temperature and mood from the scene's atmosphere but enhances it dramatically. Use the scene's ambient light as the foundation — identify its temperature (cool overcast, warm golden hour, dappled shade) and let it inform every light. Then add: a purposeful key light that creates a compelling highlight on the product's dominant surface; a subtle fill preserving shadow detail; a rim or edge light that separates the product from the background. For glass and liquids specifically: the key light must pass through or refract within the liquid, creating an internal luminosity. The lighting must feel as if it belongs to this place and time — cinematic and intentional, not flat or accidental. The product must look as though it was physically placed in that location and photographed with deliberate craft.
+LIGHTING: First — read the INDUSTRY PHOTOGRAPHY GUIDE at the top of this brief. Let its lighting specification guide your primary mood and color temperature choice: if the guide calls for warm golden outdoor sunlight, build your setup around that quality of natural light and enhance it; if it calls for a different aesthetic, apply that. Then: design a complete cinematic lighting setup that draws its color temperature and mood from the scene's atmosphere but enhances it dramatically. Use the scene's ambient light as the foundation — identify its temperature (cool overcast, warm golden hour, dappled shade) and let it inform every light. Then add: a purposeful key light that creates a compelling highlight on the product's dominant surface; a subtle fill preserving shadow detail; a rim or edge light that separates the product from the background. For glass and liquids specifically: the key light must pass through or refract within the liquid, creating an internal luminosity. The lighting must feel as if it belongs to this place and time — cinematic and intentional, not flat or accidental. The product must look as though it was physically placed in that location and photographed with deliberate craft.
 
 ATMOSPHERE: Add 1–2 subtle atmospheric details that arise naturally from the scene's character and enhance the mood — fine particles, mist, steam, caustic reflections, bokeh light scatter — whatever genuinely fits this specific location and product.
 

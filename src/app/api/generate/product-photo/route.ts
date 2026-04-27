@@ -3,6 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@/lib/supabase/server'
 import { analyzeLocationPhoto, analyzeProductAsset, generateProductPhotoPrompt, type AssetGuidance } from '@/lib/anthropic'
 import { generateImage, prefetchReferenceImages } from '@/lib/nanobanana'
+import { getLimits, monthStart } from '@/lib/plans'
 
 export const maxDuration = 300
 
@@ -10,6 +11,32 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan')
+    .eq('id', user.id)
+    .single()
+
+  const limits = getLimits(profile?.plan ?? 'free')
+
+  if (limits.productPhotosPerMonth === 0) {
+    return NextResponse.json({ error: 'Product photos require a paid plan.' }, { status: 403 })
+  }
+
+  if (limits.productPhotosPerMonth !== -1) {
+    const { count } = await supabase
+      .from('product_photos')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .neq('status', 'failed')
+      .gte('created_at', monthStart())
+    if ((count ?? 0) >= limits.productPhotosPerMonth) {
+      return NextResponse.json({
+        error: `Monthly product photo limit reached (${limits.productPhotosPerMonth}). Upgrade your plan or wait until next month.`,
+      }, { status: 403 })
+    }
+  }
 
   const { data: bb } = await supabase
     .from('brand_brains')
@@ -21,6 +48,10 @@ export async function POST(req: NextRequest) {
   // Parse request body
   const body = await req.json().catch(() => ({}))
   const assetMode: 'asset' | 'composite' = body.assetMode === 'composite' ? 'composite' : 'asset'
+
+  if (assetMode === 'composite' && !limits.composite) {
+    return NextResponse.json({ error: 'Composite mode requires the Growth plan or higher.' }, { status: 403 })
+  }
   const settings = body.settings ?? {}
 
   const assetUrl: string | undefined          = body.assetUrl

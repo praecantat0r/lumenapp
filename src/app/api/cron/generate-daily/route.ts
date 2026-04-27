@@ -6,6 +6,7 @@ import { buildBrandContext } from '@/lib/context-builder'
 import { generateImage } from '@/lib/nanobanana'
 import { renderPostServer, getOrSeedTemplateId } from '@/lib/renderer'
 import { rateLimit } from '@/lib/rate-limit'
+import { getLimits, monthStart } from '@/lib/plans'
 import type { BrandBrain } from '@/types'
 
 export async function GET(req: NextRequest) {
@@ -32,9 +33,22 @@ export async function GET(req: NextRequest) {
 
   for (const bb of brandBrains) {
     try {
-      // Skip non-premium accounts
       const plan = (bb as any).profiles?.plan
+      const limits = getLimits(plan ?? 'free')
+
+      // Only run cron for paid accounts
       if (!plan || plan === 'free') continue
+
+      // Skip if monthly post quota is already full
+      if (limits.postsPerMonth !== -1) {
+        const { count } = await supabase
+          .from('posts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', bb.user_id)
+          .neq('status', 'failed')
+          .gte('created_at', monthStart())
+        if ((count ?? 0) >= limits.postsPerMonth) continue
+      }
 
       // Check if we need to generate today based on frequency
       const freq = bb.posting_frequency || '3x/week'

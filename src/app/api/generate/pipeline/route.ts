@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getLimits, monthStart } from '@/lib/plans'
 
 export const maxDuration = 300
 import { createServiceClient } from '@/lib/supabase/service'
@@ -17,23 +18,7 @@ export async function POST(req: NextRequest) {
 
   if (!rateLimit(`gen:${user.id}`, 10, 60_000)) return rateLimitResponse()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('plan')
-    .eq('id', user.id)
-    .single()
-  if (!profile || profile.plan === 'free') {
-    return NextResponse.json({ error: 'Generation is a premium feature. Upgrade your plan to continue.' }, { status: 403 })
-  }
-
-  const { data: bb } = await supabase
-    .from('brand_brains')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
-  if (!bb) return NextResponse.json({ error: 'Brand Brain not found' }, { status: 404 })
-
-  // Parse asset configuration from request body
+  // Parse request body early — assetMode is needed for the composite plan check below
   let assetMode: 'original' | 'specific' | 'auto' | 'composite' = 'original'
   let selectedAssetUrl: string | undefined
   let selectedAssetName: string | undefined
@@ -59,6 +44,39 @@ export async function POST(req: NextRequest) {
     if (body.productAssetName)      productAssetName      = body.productAssetName
     if (body.productAssetDescription) productAssetDescription = body.productAssetDescription
   } catch { /* no body */ }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan')
+    .eq('id', user.id)
+    .single()
+
+  const limits = getLimits(profile?.plan ?? 'free')
+
+  if (assetMode === 'composite' && !limits.composite) {
+    return NextResponse.json({ error: 'Composite mode requires the Growth plan or higher.' }, { status: 403 })
+  }
+
+  if (limits.postsPerMonth !== -1) {
+    const { count } = await supabase
+      .from('posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .neq('status', 'failed')
+      .gte('created_at', monthStart())
+    if ((count ?? 0) >= limits.postsPerMonth) {
+      return NextResponse.json({
+        error: `Monthly post limit reached (${limits.postsPerMonth} posts). Upgrade your plan or wait until next month.`,
+      }, { status: 403 })
+    }
+  }
+
+  const { data: bb } = await supabase
+    .from('brand_brains')
+    .select('*')
+    .eq('user_id', user.id)
+    .single()
+  if (!bb) return NextResponse.json({ error: 'Brand Brain not found' }, { status: 404 })
 
   // Analyze scenic reference images with Claude Vision FIRST so the prompt can accurately
   // recreate the environment. Without this, Claude has no idea what's in the photo and
