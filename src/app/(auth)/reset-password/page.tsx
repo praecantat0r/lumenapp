@@ -11,30 +11,26 @@ export default function ResetPasswordPage() {
   const [confirm, setConfirm]       = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading]       = useState(false)
-  const [ready, setReady]           = useState(false)
+  const [ready, setReady]   = useState(false)
+  const [expired, setExpired] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    const supabase = createClient()
+    const params = new URLSearchParams(window.location.search)
+    window.history.replaceState({}, '', '/reset-password')
 
-    // PKCE flow: Supabase sends ?code=xxx in the URL
-    const code = new URLSearchParams(window.location.search).get('code')
-    if (code) {
+    if (params.get('verified') === 'true') {
+      setReady(true)
+    } else if (params.get('error') === 'invalid') {
+      setExpired(true)
+    } else if (params.get('code')) {
+      const code = params.get('code')!
+      const supabase = createClient()
       supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (error) {
-          toast.error('Reset link is invalid or has expired.')
-        } else {
-          setReady(true)
-        }
+        if (error) setExpired(true)
+        else setReady(true)
       })
-      return
     }
-
-    // Fallback: implicit flow (hash token) — older Supabase configs
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
-    })
-    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -129,20 +125,38 @@ export default function ResetPasswordPage() {
               New password
             </h1>
             <p style={{ fontFamily: 'var(--font-ibm)', fontWeight: 300, fontSize: 13.5, color: 'rgba(196,185,154,0.5)' }}>
-              {ready ? 'Choose a new password for your account.' : 'Verifying your reset link…'}
+              {ready ? 'Choose a new password for your account.' : expired ? 'This link can no longer be used.' : 'Verifying your reset link…'}
             </p>
           </div>
 
-          {!ready ? (
+          {expired ? (
+            <div className="a-field a-f2" style={{ textAlign: 'center' }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'rgba(201,80,80,0.1)', border: '1px solid rgba(201,80,80,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C95050" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <p style={{ fontFamily: 'var(--font-ibm)', fontWeight: 400, fontSize: 14, color: '#F6F2EA', marginBottom: 8 }}>
+                Link expired
+              </p>
+              <p style={{ fontFamily: 'var(--font-ibm)', fontWeight: 300, fontSize: 13, color: 'rgba(196,185,154,0.5)', marginBottom: 28 }}>
+                This reset link is invalid or has already been used.
+              </p>
+              <Link href="/forgot-password" style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, fontWeight: 400, color: '#D4A84B', textDecoration: 'none' }}>
+                Request a new link →
+              </Link>
+            </div>
+          ) : !ready ? (
             <div className="a-field a-f2" style={{ textAlign: 'center' }}>
               <div style={{ width: 20, height: 20, border: '2px solid rgba(212,168,75,0.3)', borderTopColor: '#D4A84B', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               <p style={{ fontFamily: 'var(--font-ibm)', fontSize: 12, color: 'rgba(196,185,154,0.35)', marginTop: 16 }}>
-                If this takes too long, request a new link.
+                Verifying reset link…
               </p>
-              <Link href="/forgot-password" style={{ display: 'inline-block', marginTop: 12, fontFamily: 'var(--font-ibm)', fontSize: 13, color: '#D4A84B', textDecoration: 'none' }}>
-                Request new link
-              </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>

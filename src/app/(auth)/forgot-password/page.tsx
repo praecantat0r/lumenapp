@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
     recordAttempt()
     const supabase = createClient()
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     })
     if (error) {
       if (error.message.toLowerCase().includes('rate limit') || error.status === 429) {

@@ -1494,6 +1494,19 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     canvas.requestRenderAll()
   }
 
+  function centerBoth() {
+    const canvas = fabricRef.current
+    const obj = canvas?.getActiveObject()
+    if (!canvas || !obj) return
+    if (obj.originX === 'center') obj.set('left', DISPLAY_WIDTH / 2)
+    else obj.set('left', (DISPLAY_WIDTH - obj.getScaledWidth()) / 2)
+    if (obj.originY === 'center') obj.set('top', DISPLAY_HEIGHT / 2)
+    else obj.set('top', (DISPLAY_HEIGHT - obj.getScaledHeight()) / 2)
+    obj.setCoords()
+    canvas.requestRenderAll()
+    pushUndo()
+  }
+
   // ── Property updaters ──────────────────────────────────────────────────────────
   function updateText(value: string) {
     if (!selectedObj) return
@@ -2059,6 +2072,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                   {[
                     { label: 'Center H', action: centerH },
                     { label: 'Center V', action: centerV },
+                    { label: 'Center', action: centerBoth },
                   ].map(({ label, action }) => (
                     <button
                       key={label}
