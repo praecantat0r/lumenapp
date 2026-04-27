@@ -245,9 +245,16 @@ export default function LoginPage() {
               </div>
 
               <div className="a-field a-f3">
-                <label style={{ display: 'block', fontFamily: 'var(--font-ibm)', fontSize: 9.5, fontWeight: 400, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(196,185,154,0.45)', marginBottom: 10 }}>
-                  Password
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                  <label style={{ display: 'block', fontFamily: 'var(--font-ibm)', fontSize: 9.5, fontWeight: 400, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(196,185,154,0.45)' }}>
+                    Password
+                  </label>
+                  <Link href="/forgot-password" style={{ fontFamily: 'var(--font-ibm)', fontSize: 11.5, fontWeight: 300, color: 'rgba(196,185,154,0.4)', textDecoration: 'none', transition: 'color 0.2s' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#D4A84B')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(196,185,154,0.4)')}>
+                    Forgot password?
+                  </Link>
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input
                     className="auth-input"
