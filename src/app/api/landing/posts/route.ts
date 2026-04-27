@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const { data } = await supabase
     .from('posts')
     .select('caption, hashtags, render_url, created_at')
-    .eq('status', 'published')
+    .eq('featured_on_landing', true)
     .not('render_url', 'is', null)
     .order('created_at', { ascending: false })
     .limit(limit)

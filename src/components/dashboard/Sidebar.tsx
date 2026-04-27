@@ -38,6 +38,8 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
   const initials = getInitials(userName, userEmail)
   const isActive = (href: string) => pathname === href || (href !== '/dashboard/overview' && pathname.startsWith(href))
 
+  const isAdminRoute = pathname.startsWith('/admin')
+
   const navItems = [
     { href: '/dashboard/overview',           label: t('nav.overview'),          icon: 'dashboard' },
     { href: '/dashboard/posts',              label: t('nav.posts'),             icon: 'calendar_view_month', badge: pendingCount > 0 ? pendingCount : null },
@@ -46,6 +48,11 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
     { href: '/dashboard/templates',          label: t('nav.templates'),         icon: 'grid_view' },
     { href: '/dashboard/statistics',         label: t('nav.analytics'),         icon: 'monitoring' },
     { href: '/dashboard/brand-brain',        label: t('nav.brandBrain'),        icon: 'psychology' },
+  ]
+
+  const adminNavItems = [
+    { href: '/admin/templates',     label: 'Templates',      icon: 'layers' },
+    { href: '/admin/landing-posts', label: 'Landing Posts',  icon: 'web' },
   ]
 
   const bottomItems = [
@@ -195,6 +202,43 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
                 </a>
               )
             })}
+
+            {/* Admin nav — only when on /admin/* routes */}
+            {isAdminRoute && (
+              <>
+                <div style={{ height: 1, background: 'rgba(78,69,56,0.25)', margin: '10px 4px' }} />
+                {!collapsed && (
+                  <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', padding: '2px 8px 4px' }}>
+                    Admin
+                  </div>
+                )}
+                {adminNavItems.map(item => {
+                  const active = isActive(item.href)
+                  if (collapsed) return (
+                    <a key={item.href} href={item.href} title={item.label} onClick={onMobileClose} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      height: 44, borderRadius: 10, textDecoration: 'none', cursor: 'pointer',
+                      color: active ? 'var(--candle)' : 'var(--sand)',
+                      background: active ? 'rgba(182,141,64,0.12)' : 'transparent',
+                      transition: 'background 0.2s, color 0.2s', flexShrink: 0,
+                    }}>
+                      <span className="material-symbols-outlined" style={{
+                        fontSize: 20, lineHeight: 1, display: 'block',
+                        fontVariationSettings: active ? "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24" : "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
+                      }}>{item.icon}</span>
+                    </a>
+                  )
+                  return (
+                    <a key={item.href} href={item.href} onClick={onMobileClose} className={`sb2-item${active ? ' active' : ''}`}>
+                      <span className="sb2-icon material-symbols-outlined" style={{
+                        fontVariationSettings: active ? "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24" : "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24"
+                      }}>{item.icon}</span>
+                      <span className="sb2-label">{item.label}</span>
+                    </a>
+                  )
+                })}
+              </>
+            )}
 
             {/* Divider */}
             <div style={{ height: 1, background: 'rgba(78,69,56,0.25)', margin: '10px 4px' }} />
