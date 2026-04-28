@@ -71,6 +71,11 @@ function App() {
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' })
   }
 
+  const scrollToVideo = () => {
+    const el = document.getElementById('video')
+    if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' })
+  }
+
   const goToSignup = () => {
     window.location.href = 'https://app.lumen-reach.com/signup'
   }
@@ -91,6 +96,7 @@ function App() {
         headline={state.headline}
         ctaLabel={state.ctaLabel}
         onCTA={goToSignup}
+        onWatchDemo={scrollToVideo}
       />
 
       {state.sections.howItWorks  && <HowItWorks />}

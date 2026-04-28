@@ -15,7 +15,7 @@ export function VideoPreview() {
   }
 
   return (
-    <section style={{ padding: isMobile ? '0 20px 72px' : '0 32px 120px' }}>
+    <section id="video" style={{ padding: isMobile ? '0 20px 72px' : '0 32px 120px' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div style={{
           position: 'relative', aspectRatio: '16/9', borderRadius: isMobile ? 12 : 16, overflow: 'hidden',

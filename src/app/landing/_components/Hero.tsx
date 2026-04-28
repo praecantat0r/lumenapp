@@ -32,9 +32,10 @@ interface HeroProps {
   headline?: string
   ctaLabel?: string
   onCTA: () => void
+  onWatchDemo?: () => void
 }
 
-export function HeroA({ theme, headline, ctaLabel, onCTA }: HeroProps) {
+export function HeroA({ theme, headline, ctaLabel, onCTA, onWatchDemo }: HeroProps) {
   const { t } = useT()
   const { isMobile } = useBreakpoint()
   return (
@@ -86,7 +87,7 @@ export function HeroA({ theme, headline, ctaLabel, onCTA }: HeroProps) {
             <Button variant="primary" size="lg" icon="arrow_forward" onClick={onCTA}>
               {ctaLabel || t.hero.cta}
             </Button>
-            <Button variant="ghost" size="lg" icon="play_circle">{t.hero.watch}</Button>
+            <Button variant="ghost" size="lg" icon="play_circle" onClick={onWatchDemo}>{t.hero.watch}</Button>
           </div>
 
           <div style={{
@@ -108,7 +109,7 @@ export function HeroA({ theme, headline, ctaLabel, onCTA }: HeroProps) {
   )
 }
 
-export function HeroB({ theme, headline, ctaLabel, onCTA }: HeroProps) {
+export function HeroB({ theme, headline, ctaLabel, onCTA, onWatchDemo }: HeroProps) {
   const { t } = useT()
   const { isMobile } = useBreakpoint()
   return (
@@ -149,7 +150,7 @@ export function HeroB({ theme, headline, ctaLabel, onCTA }: HeroProps) {
           <Button variant="primary" size="lg" icon="arrow_forward" onClick={onCTA}>
             {ctaLabel || t.hero.cta}
           </Button>
-          <Button variant="ghost" size="lg" icon="play_circle">{t.hero.watch}</Button>
+          <Button variant="ghost" size="lg" icon="play_circle" onClick={onWatchDemo}>{t.hero.watch}</Button>
         </div>
       </div>
 
