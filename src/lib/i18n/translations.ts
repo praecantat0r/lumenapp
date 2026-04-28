@@ -257,6 +257,8 @@ const en: Dict = {
     postsScheduled: '{n} posts scheduled',
     fullCalendar: 'Full Calendar View',
     days: { Mon: 'Mon', Tue: 'Tue', Wed: 'Wed', Thu: 'Thu', Fri: 'Fri', Sat: 'Sat', Sun: 'Sun' },
+    noPendingPosts: 'No posts pending review',
+    noPendingDesc: 'Generate one and Lumen will write, design, and prepare it for you automatically.',
   },
   posts: {
     headerLabel: 'Content Library',
@@ -307,6 +309,9 @@ const en: Dict = {
     comments: 'Comments',
     engRate: 'Eng. rate',
     viewPost: 'View post ↗',
+    cardGenerating: 'Generating content…',
+    cardNoCaption: 'No caption yet',
+    cardApiError: 'API Error — Retry',
   },
 }
 
@@ -555,6 +560,8 @@ const sk: Dict = {
     postsScheduled: '{n} príspevkov naplánovaných',
     fullCalendar: 'Celý kalendár',
     days: { Mon: 'Pon', Tue: 'Uto', Wed: 'Str', Thu: 'Štv', Fri: 'Pia', Sat: 'Sob', Sun: 'Ned' },
+    noPendingPosts: 'Žiadne príspevky čakajú na schválenie',
+    noPendingDesc: 'Vygenerujte jeden a Lumen napíše, navrhne a pripraví ho automaticky.',
   },
   posts: {
     headerLabel: 'Knižnica obsahu',
@@ -605,6 +612,9 @@ const sk: Dict = {
     comments: 'Komentáre',
     engRate: 'Miera eng.',
     viewPost: 'Zobraziť príspevok ↗',
+    cardGenerating: 'Generujem obsah…',
+    cardNoCaption: 'Zatiaľ žiadny popis',
+    cardApiError: 'Chyba API — Skúsiť znova',
   },
 }
 
@@ -853,6 +863,8 @@ const cs: Dict = {
     postsScheduled: '{n} příspěvků naplánováno',
     fullCalendar: 'Celý kalendář',
     days: { Mon: 'Po', Tue: 'Út', Wed: 'St', Thu: 'Čt', Fri: 'Pá', Sat: 'So', Sun: 'Ne' },
+    noPendingPosts: 'Žádné příspěvky čekají na schválení',
+    noPendingDesc: 'Vygenerujte jeden a Lumen napíše, navrhne a připraví ho automaticky.',
   },
   posts: {
     headerLabel: 'Knihovna obsahu',
@@ -903,6 +915,9 @@ const cs: Dict = {
     comments: 'Komentáře',
     engRate: 'Míra eng.',
     viewPost: 'Zobrazit příspěvek ↗',
+    cardGenerating: 'Generuji obsah…',
+    cardNoCaption: 'Zatím žádný popis',
+    cardApiError: 'Chyba API — Zkusit znovu',
   },
 }
 

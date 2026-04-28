@@ -2,6 +2,8 @@
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import type { Post } from '@/types'
+import { getStatusConfig } from '@/lib/post-status'
+import { useLanguage } from '@/lib/i18n/context'
 
 const ASSET_TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   product_photo: { icon: 'inventory_2',     color: '#b68d40' },
@@ -13,17 +15,19 @@ const ASSET_TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   other:         { icon: 'category',        color: '#989084' },
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  pending_review: { label: 'PENDING REVIEW', color: '#b68d40',         bg: 'rgba(14,14,13,0.8)',  border: 'rgba(182,141,64,0.2)',  icon: 'pending' },
-  approved:       { label: 'APPROVED',       color: '#6EBF8B',         bg: 'rgba(14,14,13,0.8)',  border: 'rgba(110,191,139,0.25)',icon: 'check_circle' },
-  published:      { label: 'PUBLISHED',      color: 'var(--parchment)',bg: 'rgba(78,69,56,0.7)',   border: 'rgba(255,255,255,0.1)', icon: 'publish' },
-  failed:         { label: 'FAILED',         color: '#ffb4ab',         bg: 'rgba(147,0,10,0.75)', border: 'rgba(255,180,171,0.2)', icon: 'error' },
-  generating:     { label: 'GENERATING',     color: 'var(--sand)',     bg: 'rgba(14,14,13,0.8)',  border: 'rgba(201,194,181,0.15)',icon: 'autorenew' },
+const STATUS_LABELS: Record<string, string> = {
+  pending_review: 'PENDING REVIEW',
+  approved:       'APPROVED',
+  published:      'PUBLISHED',
+  failed:         'FAILED',
+  generating:     'GENERATING',
 }
 
 export function PostCard({ post, onClick }: { post: Post; onClick?: () => void }) {
   const router = useRouter()
-  const s      = STATUS_CONFIG[post.status] || STATUS_CONFIG.generating
+  const { t }  = useLanguage()
+  const sc     = getStatusConfig(post.status)
+  const s      = { color: sc.color, bg: sc.cardBg, border: sc.cardBorder, icon: sc.icon, label: STATUS_LABELS[post.status] ?? post.status.toUpperCase() }
   const an     = (post.analytics || {}) as Record<string, number>
   const isGen  = post.status === 'generating'
   const meta   = (post.generation_metadata || {}) as Record<string, string>
@@ -128,16 +132,16 @@ export function PostCard({ post, onClick }: { post: Post; onClick?: () => void }
               &ldquo;{post.caption.trim()}&rdquo;
             </p>
           ) : post.status === 'generating' ? (
-            <p style={{ fontSize: 13, color: 'var(--muted)', fontStyle: 'italic', flex: 1, marginBottom: 20 }}>Generating content…</p>
+            <p style={{ fontSize: 13, color: 'var(--muted)', fontStyle: 'italic', flex: 1, marginBottom: 20 }}>{t('posts.cardGenerating')}</p>
           ) : (
-            <p style={{ fontSize: 13, color: 'var(--muted)', fontStyle: 'italic', flex: 1, marginBottom: 20 }}>No caption yet</p>
+            <p style={{ fontSize: 13, color: 'var(--muted)', fontStyle: 'italic', flex: 1, marginBottom: 20 }}>{t('posts.cardNoCaption')}</p>
           )}
 
           {/* Footer */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(78,69,56,0.1)', paddingTop: 14, marginTop: 'auto' }}>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 500 }}>
               {post.status === 'failed' ? (
-                <span style={{ color: '#ffb4ab' }}>API Error — Retry</span>
+                <span style={{ color: '#ffb4ab' }}>{t('posts.cardApiError')}</span>
               ) : (
                 format(new Date(post.created_at), 'MMM d, yyyy')
               )}

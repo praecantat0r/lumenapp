@@ -32,9 +32,15 @@ export async function PATCH(
   const { id } = await params
   const body = await req.json()
 
+  const ALLOWED_FIELDS = ['caption', 'hashtags', 'canvas_json', 'generation_metadata']
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  for (const key of ALLOWED_FIELDS) {
+    if (key in body) patch[key] = body[key]
+  }
+
   const { data, error } = await supabase
     .from('posts')
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', id)
     .eq('user_id', user.id)
     .select()

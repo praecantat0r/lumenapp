@@ -1,14 +1,19 @@
 'use client'
 import { useState } from 'react'
-import { Input } from '@/components/ui/Input'
 import type { BrandBrainForm } from '@/types'
 import { useLanguage } from '@/lib/i18n/context'
 
 const PLATFORMS = [
-  { id: 'instagram', label: 'Instagram', symbol: '◎' },
-  { id: 'facebook',  label: 'Facebook',  symbol: '◈' },
-  { id: 'tiktok',    label: 'TikTok',    symbol: '◉' },
+  { id: 'instagram', label: 'Instagram', symbol: '◎', available: true },
+  { id: 'facebook',  label: 'Facebook',  symbol: '◈', available: false },
+  { id: 'tiktok',    label: 'TikTok',    symbol: '◉', available: false },
 ]
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2)
+  const m = i % 2 === 0 ? '00' : '30'
+  return `${h}:${m}`
+})
 
 const FREQUENCIES = ['Daily', '5x/week', '3x/week', '2x/week', '1x/week']
 
@@ -25,6 +30,7 @@ export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Pro
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   function togglePlatform(id: string) {
+    if (!PLATFORMS.find(p => p.id === id)?.available) return
     const curr = data.platforms
     if (curr.includes(id)) onChange({ platforms: curr.filter(p => p !== id) })
     else onChange({ platforms: [...curr, id] })
@@ -49,10 +55,14 @@ export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Pro
             <button
               key={p.id}
               onClick={() => togglePlatform(p.id)}
+              disabled={!p.available}
               className={`ob-platform${data.platforms.includes(p.id) ? ' ob-platform-on' : ''}`}
+              style={!p.available ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+              title={!p.available ? 'Coming soon' : undefined}
             >
-              <div style={{ fontSize: 20, marginBottom: 6, fontFamily: 'monospace' }}>{p.symbol}</div>
+              <div style={{ fontSize: 20, marginBottom: 4, fontFamily: 'monospace' }}>{p.symbol}</div>
               <div style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{p.label}</div>
+              {!p.available && <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 3, opacity: 0.7 }}>soon</div>}
             </button>
           ))}
         </div>
@@ -73,10 +83,20 @@ export function Step5Settings({ data, onChange, onSubmit, onBack, loading }: Pro
         {errors.posting_frequency && <p style={{ fontSize: 11, color: 'var(--error)', fontFamily: 'var(--font-ibm)' }}>{errors.posting_frequency}</p>}
       </div>
 
-      <Input label={t('onboarding.postingTime')}
-        placeholder={t('onboarding.postingTimePlaceholder')}
-        value={data.posting_time}
-        onChange={e => onChange({ posting_time: e.target.value })} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={{ fontFamily: 'var(--font-ibm)', fontSize: 13, color: 'rgba(196,185,154,0.5)', fontWeight: 300 }}>
+          {t('onboarding.postingTime')}
+        </label>
+        <select
+          value={data.posting_time || '9:00'}
+          onChange={e => onChange({ posting_time: e.target.value })}
+          style={{ width: '100%', fontFamily: 'var(--font-ibm)', fontSize: 14, color: '#F6F2EA', cursor: 'pointer' }}
+        >
+          {TIME_OPTIONS.map(time => (
+            <option key={time} value={time} style={{ background: '#111009' }}>{time}</option>
+          ))}
+        </select>
+      </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 }}>
         <button className="ob-btn-ghost" onClick={onBack}>{t('common.back')}</button>

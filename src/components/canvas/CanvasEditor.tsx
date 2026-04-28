@@ -135,10 +135,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   const [strokeWidth, setStrokeWidth] = useState(0)
   const [radius, setRadius]         = useState(0)
 
-  // Position
-  const [posX, setPosX] = useState(0)
-  const [posY, setPosY] = useState(0)
-
   // Image effects (0-100 scale for UI; mapped internally)
   const [effectBlur,       setEffectBlur]       = useState(0)
   const [effectBW,         setEffectBW]         = useState(0)
@@ -547,8 +543,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   useEffect(() => {
     if (!selectedObj) return
     const t = selectedObj.type ?? ''
-    setPosX(Math.round((selectedObj.left ?? 0) / SCALE))
-    setPosY(Math.round((selectedObj.top  ?? 0) / SCALE))
     setOpacity(selectedObj.opacity ?? 1)
 
     if (isText(t)) {
@@ -1773,14 +1767,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     canvas.renderAll()
   }
 
-  function updatePosition(x: number, y: number) {
-    if (!selectedObj) return
-    selectedObj.set({ left: x * SCALE, top: y * SCALE })
-    selectedObj.setCoords()
-    setPosX(x); setPosY(y)
-    fabricRef.current?.requestRenderAll()
-  }
-
   // ── Save ───────────────────────────────────────────────────────────────────────
   async function handleSave() {
     setSaving(true)
@@ -2984,28 +2970,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
 
             {selectedObj && (
               <>
-                {/* ── POSITIONING ── */}
-                <div style={{ marginBottom: 16 }}>
-                  <span style={sectionLabel}>Positioning</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {(['X', 'Y'] as const).map(axis => (
-                      <div key={axis} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginBottom: 4 }}>{axis} Axis</div>
-                        <input
-                          type="number"
-                          value={axis === 'X' ? posX : posY}
-                          onChange={e => {
-                            const v = Number(e.target.value)
-                            if (axis === 'X') updatePosition(v, posY)
-                            else updatePosition(posX, v)
-                          }}
-                          style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--parchment)', fontFamily: 'monospace', fontSize: 13, width: '100%', padding: 0 }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 {/* ── TEXT PROPERTIES ── */}
                 {selIsText && (
                   <div style={{ marginBottom: 16 }}>
@@ -3231,26 +3195,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                         />
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* ── IMAGE PROPERTIES ── */}
-                {selIsImage && (
-                  <div style={{ marginBottom: 16 }}>
-                    <span style={sectionLabel}>Media</span>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                      {['Width', 'Height'].map((dim) => {
-                        const val = dim === 'Width'
-                          ? Math.round((selectedObj.width ?? 0) * (selectedObj.scaleX ?? 1) / SCALE)
-                          : Math.round((selectedObj.height ?? 0) * (selectedObj.scaleY ?? 1) / SCALE)
-                        return (
-                          <div key={dim} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
-                            <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', marginBottom: 4 }}>{dim}</div>
-                            <span style={{ fontSize: 13, color: 'var(--parchment)', fontFamily: 'monospace' }}>{val}px</span>
-                          </div>
-                        )
-                      })}
-                    </div>
                   </div>
                 )}
 

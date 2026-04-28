@@ -261,23 +261,29 @@ export default function StatisticsPage() {
   const [apiData, setApiData]   = useState<StatsData | null>(null)
   const [loading, setLoading]   = useState(true)
   const [isLive, setIsLive]     = useState(false)
+  const [apiError, setApiError] = useState(false)
 
   useEffect(() => {
     setLoading(true)
+    setApiError(false)
     fetch(`/api/instagram/stats?period=${period}`)
       .then(r => r.json())
       .then(data => {
         if (!data.error && (data.insights?.length || data.media?.length)) {
           setApiData(data)
           setIsLive(true)
+        } else {
+          setApiData(null)
+          setIsLive(false)
         }
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => { setApiError(true); setLoading(false) })
   }, [period])
 
   const parsedData = apiData ? parseApiData(apiData, period) : null
   const d          = parsedData ?? MOCK[period]
+  const isDemo     = !parsedData && !loading
   const kpi        = d.kpi
 
   const maxEngRate = d.engData.length ? Math.max(...d.engData.map(e => e.rate)) : 8
@@ -459,7 +465,6 @@ export default function StatisticsPage() {
           .st-topbar { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; padding: 16px 20px !important; }
           .st-topbar-right { width: 100%; display: flex; gap: 8px; align-items: center; }
           .st-period-btns { flex: 1; }
-          .st-export-btn { flex-shrink: 0; }
           .st-content { overflow: visible !important; flex: none !important; height: auto !important; padding: 16px 16px 40px !important; }
           .st-kpi-grid        { grid-template-columns: 1fr 1fr !important; gap: 10px !important; margin-bottom: 16px !important; }
           .st-insights-grid   { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 16px !important; }
@@ -478,10 +483,24 @@ export default function StatisticsPage() {
         <div>
           <span style={{ fontSize:10, letterSpacing:'0.14em', textTransform:'uppercase', color:'var(--candle)', fontWeight:600 }}>Performance Portfolio</span>
           <h1 style={{ fontFamily:'var(--font-syne)', fontSize:32, fontWeight:800, letterSpacing:'-.03em', color:'var(--parchment)', lineHeight:1.1, marginTop:4 }}>Statistics</h1>
-          {isLive && !loading && (
+          {!loading && (
             <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:6 }}>
-              <div style={{ width:6, height:6, borderRadius:'50%', background:'#6EBF8B' }}/>
-              <span style={{ fontSize:10, color:'rgba(110,191,139,.8)', fontFamily:'var(--font-ibm)' }}>Live Instagram data</span>
+              {isLive ? (
+                <>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:'#6EBF8B' }}/>
+                  <span style={{ fontSize:10, color:'rgba(110,191,139,.8)', fontFamily:'var(--font-ibm)' }}>Live Instagram data</span>
+                </>
+              ) : apiError ? (
+                <>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:'#E07070' }}/>
+                  <span style={{ fontSize:10, color:'rgba(224,112,112,.8)', fontFamily:'var(--font-ibm)' }}>Could not load Instagram data</span>
+                </>
+              ) : (
+                <>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:'#D4A84B' }}/>
+                  <span style={{ fontSize:10, color:'rgba(212,168,75,.7)', fontFamily:'var(--font-ibm)' }}>Demo data — connect Instagram to see your real stats</span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -491,19 +510,24 @@ export default function StatisticsPage() {
               <button key={p} onClick={() => setPeriod(p)} className={`st-pb${period===p?' on':''}`}>{p}d</button>
             ))}
           </div>
-          <button
-            className="st-export-btn"
-            style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'9px 20px', background:'var(--candle)', color:'#ffffff', border:'none', borderRadius:9999, fontFamily:'var(--font-syne)', fontSize:13, fontWeight:700, cursor:'pointer', transition:'background 0.15s' }}
-            onMouseEnter={e=>{e.currentTarget.style.background='var(--ember)'}}
-            onMouseLeave={e=>{e.currentTarget.style.background='var(--candle)'}}>
-            <span className="material-symbols-outlined" style={{fontSize:16}}>file_download</span>
-            Export Data
-          </button>
         </div>
       </div>
 
       {/* ── Content ── */}
       <div className="st-content" style={{ flex:1, overflowY:'auto', padding:'28px 32px 52px', opacity: loading ? 0.5 : 1, transition:'opacity .2s' }}>
+
+        {/* Demo / Error banner */}
+        {!loading && isDemo && (
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 18px', borderRadius:12, border:`1px solid ${apiError ? 'rgba(224,112,112,0.25)' : 'rgba(212,168,75,0.25)'}`, background: apiError ? 'rgba(224,112,112,0.06)' : 'rgba(212,168,75,0.06)', marginBottom:20 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18, color: apiError ? '#E07070' : '#D4A84B', flexShrink:0 }}>{apiError ? 'error_outline' : 'info'}</span>
+            <span style={{ fontSize:12, color:'var(--sand)', lineHeight:1.5 }}>
+              {apiError
+                ? <><strong style={{ color:'var(--parchment)' }}>Could not load your Instagram data.</strong> The charts below show sample data. Check your Instagram connection in Brand Brain settings.</>
+                : <><strong style={{ color:'var(--parchment)' }}>Sample data.</strong> These charts show illustrative numbers, not your real Instagram performance. Connect your Instagram account in Brand Brain to see actual stats.</>
+              }
+            </span>
+          </div>
+        )}
 
         {/* KPI bento grid */}
         <div className="st-r1 st-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>

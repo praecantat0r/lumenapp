@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { PostCard } from './PostCard'
@@ -8,17 +8,10 @@ import { GeneratePostModal } from './GeneratePostModal'
 import type { Post, BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/lib/i18n/context'
+import { useGeneratePost } from '@/hooks/useGeneratePost'
+import { getStatusConfig } from '@/lib/post-status'
 
 type Filter = 'all' | 'pending_review' | 'approved' | 'published' | 'failed'
-
-const STATUS_BADGE: Record<string, { bg: string; color: string; border: string }> = {
-  pending_review: { bg: 'rgba(212,168,75,.18)',   color: '#D4A84B', border: '1px solid rgba(212,168,75,.3)' },
-  approved:       { bg: 'rgba(110,191,139,.14)', color: '#6EBF8B', border: '1px solid rgba(110,191,139,.25)' },
-  published:      { bg: 'rgba(100,160,255,.14)', color: '#7AABFF', border: '1px solid rgba(100,160,255,.25)' },
-  failed:         { bg: 'rgba(224,112,112,.14)', color: '#E07070', border: '1px solid rgba(224,112,112,.25)' },
-  generating:     { bg: 'rgba(120,112,88,.15)',  color: '#C4B99A', border: '1px solid rgba(120,112,88,.2)' },
-}
-// STATUS_LABELS is built inside the component using t() to support live translation
 
 interface Props {
   posts: Post[]
@@ -36,8 +29,6 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
   const [query, setQuery]     = useState(initialQuery)
   const [selected, setSelected] = useState<Post | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [genStep, setGenStep] = useState('')
 
   const STATUS_LABELS: Record<string, string> = {
     pending_review: t('posts.statusPending'),
@@ -50,35 +41,27 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
   useEffect(() => { setPosts(initialPosts) }, [initialPosts])
   const [deleting, setDeleting] = useState(false)
   const [showGenModal, setShowGenModal] = useState(false)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const { generating, genStep, generatePost } = useGeneratePost(
+    [t('posts.genStep1'), t('posts.genStep2'), t('posts.genStep3'), t('posts.genStep4'), t('posts.genStep5')],
+    () => { toast.success(t('posts.toastReady')); router.refresh() },
+    (msg) => toast.error(msg),
+  )
 
   const filter = initialFilter as Filter
 
-  const MOBILE_PAGE_SIZE = 5
-  const [isMobile, setIsMobile] = useState(false)
-  const [mobilePage, setMobilePage] = useState(1)
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)')
-    setIsMobile(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
-
-  useEffect(() => { setMobilePage(1) }, [filter, query, page])
-
-  function navigate(f: Filter, p = 1) {
+  function navigate(f: Filter, p = 1, q?: string) {
     const params = new URLSearchParams()
     if (f !== 'all') params.set('filter', f)
     if (p > 1) params.set('page', String(p))
+    const searchQ = q !== undefined ? q : query
+    if (searchQ) params.set('q', searchQ)
     const qs = params.toString()
     router.push(`/dashboard/posts${qs ? `?${qs}` : ''}`)
   }
 
-  const filtered = posts.filter(p => {
-    const q = query.toLowerCase()
-    return !q || (p.caption || '').toLowerCase().includes(q) || (p.hashtags || '').toLowerCase().includes(q)
-  })
+  const filtered = posts
 
   function openDetail(post: Post) { setSelected(post); setPanelOpen(true) }
   function closeDetail() { setPanelOpen(false); setTimeout(() => setSelected(null), 300) }
@@ -95,52 +78,6 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
       router.refresh()
     } finally {
       setDeleting(false)
-    }
-  }
-
-  async function generatePost(config: { assetMode: 'original' | 'auto' | 'specific' | 'composite'; assetUrl?: string; assetName?: string; assetType?: string; assetDescription?: string; scenicAssetUrl?: string; scenicAssetName?: string; scenicAssetDescription?: string; productAssetUrl?: string; productAssetName?: string; productAssetDescription?: string }) {
-    const STEPS = [t('posts.genStep1'), t('posts.genStep2'), t('posts.genStep3'), t('posts.genStep4'), t('posts.genStep5')]
-    setShowGenModal(false)
-    setGenerating(true)
-    setGenStep(STEPS[0])
-    let stepIdx = 0
-    const stepInterval = setInterval(() => {
-      stepIdx = Math.min(stepIdx + 1, STEPS.length - 1)
-      setGenStep(STEPS[stepIdx])
-    }, 18000)
-    try {
-      const res = await fetch('/api/generate/pipeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      })
-      if (!res.ok) {
-        const e = await res.json()
-        throw new Error(e.error || 'Generation failed')
-      }
-      const data = await res.json()
-      const { post_id } = data
-      const pollInterval = setInterval(async () => {
-        try {
-          const s = await fetch(`/api/posts/${post_id}/status`)
-          const d = await s.json()
-          if (d.status === 'pending_review' || d.status === 'failed') {
-            clearInterval(pollInterval)
-            clearInterval(stepInterval)
-            setGenerating(false)
-            if (d.status === 'pending_review') {
-              toast.success(t('posts.toastReady'))
-              router.refresh()
-            } else {
-              toast.error(t('posts.toastFailed'))
-            }
-          }
-        } catch { /* ignore */ }
-      }, 3000)
-    } catch (err: unknown) {
-      clearInterval(stepInterval)
-      toast.error(err instanceof Error ? err.message : t('posts.toastFailed'))
-      setGenerating(false)
     }
   }
 
@@ -309,7 +246,12 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
           <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--muted)', pointerEvents: 'none' }}>search</span>
           <input
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => {
+              const val = e.target.value
+              setQuery(val)
+              if (searchDebounce.current) clearTimeout(searchDebounce.current)
+              searchDebounce.current = setTimeout(() => navigate(filter, 1, val), 400)
+            }}
             placeholder={t('posts.searchPlaceholder')}
             className="pt-search-input"
             style={{
@@ -326,89 +268,47 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
 
       {/* ── Grid ── */}
       <div className="pt-content" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px 48px', background: 'var(--carbon)' }}>
-        {(() => {
-          const mobileTotalPages = Math.max(1, Math.ceil(filtered.length / MOBILE_PAGE_SIZE))
-          const visiblePosts = isMobile
-            ? filtered.slice((mobilePage - 1) * MOBILE_PAGE_SIZE, mobilePage * MOBILE_PAGE_SIZE)
-            : filtered
-          const mobileHasPrev = mobilePage > 1 || page > 1
-          const mobileHasNext = mobilePage < mobileTotalPages || page < totalPages
+        {filtered.length > 0 ? (
+          <div className="pt-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
+            {filtered.map(post => <PostCard key={post.id} post={post} onClick={() => openDetail(post)} />)}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px', textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(182,141,64,0.08)', border: '1px solid rgba(182,141,64,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--candle)', opacity: 0.5 }}>search_off</span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-syne)', fontSize: 18, fontWeight: 700, color: 'var(--sand)', marginBottom: 8 }}>{t('posts.noPostsFound')}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 280 }}>{t('posts.noPostsHint')}</div>
+          </div>
+        )}
 
-          return (
-            <>
-              {visiblePosts.length > 0 ? (
-                <div className="pt-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
-                  {visiblePosts.map(post => <PostCard key={post.id} post={post} onClick={() => openDetail(post)} />)}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px', textAlign: 'center' }}>
-                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(182,141,64,0.08)', border: '1px solid rgba(182,141,64,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--candle)', opacity: 0.5 }}>search_off</span>
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-syne)', fontSize: 18, fontWeight: 700, color: 'var(--sand)', marginBottom: 8 }}>{t('posts.noPostsFound')}</div>
-                  <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 280 }}>{t('posts.noPostsHint')}</div>
-                </div>
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 40 }}>
+            <button className="pt-page-btn" disabled={page <= 1} onClick={() => navigate(filter, page - 1)}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((p, i) =>
+                p === 'ellipsis' ? (
+                  <span key={`e${i}`} style={{ color: 'var(--muted)', fontSize: 13, padding: '0 4px' }}>…</span>
+                ) : (
+                  <button key={p} className={`pt-page-btn${p === page ? ' pt-page-active' : ''}`} onClick={() => navigate(filter, p as number)}>
+                    {p}
+                  </button>
+                )
               )}
-
-              {/* ── Mobile pagination ── */}
-              {isMobile && (mobileHasPrev || mobileHasNext) && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, padding: '0 4px' }}>
-                  <button
-                    className="pt-page-btn"
-                    disabled={!mobileHasPrev}
-                    onClick={() => {
-                      if (mobilePage > 1) setMobilePage(p => p - 1)
-                      else navigate(filter, page - 1)
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
-                  </button>
-                  <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>
-                    {(mobilePage - 1) * MOBILE_PAGE_SIZE + 1}–{Math.min(mobilePage * MOBILE_PAGE_SIZE, filtered.length)} of {filtered.length}{page < totalPages ? '+' : ''}
-                  </span>
-                  <button
-                    className="pt-page-btn"
-                    disabled={!mobileHasNext}
-                    onClick={() => {
-                      if (mobilePage < mobileTotalPages) setMobilePage(p => p + 1)
-                      else navigate(filter, page + 1)
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
-                  </button>
-                </div>
-              )}
-
-              {/* ── Desktop pagination ── */}
-              {!isMobile && totalPages > 1 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 40 }}>
-                  <button className="pt-page-btn" disabled={page <= 1} onClick={() => navigate(filter, page - 1)}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-                    .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
-                      acc.push(p)
-                      return acc
-                    }, [])
-                    .map((p, i) =>
-                      p === 'ellipsis' ? (
-                        <span key={`e${i}`} style={{ color: 'var(--muted)', fontSize: 13, padding: '0 4px' }}>…</span>
-                      ) : (
-                        <button key={p} className={`pt-page-btn${p === page ? ' pt-page-active' : ''}`} onClick={() => navigate(filter, p as number)}>
-                          {p}
-                        </button>
-                      )
-                    )}
-                  <button className="pt-page-btn" disabled={page >= totalPages} onClick={() => navigate(filter, page + 1)}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
-                  </button>
-                </div>
-              )}
-            </>
-          )
-        })()}
+            <button className="pt-page-btn" disabled={page >= totalPages} onClick={() => navigate(filter, page + 1)}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Detail backdrop ── */}
@@ -429,8 +329,8 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><line x1="13" y1="3" x2="3" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
                 </button>
                 {(() => {
-                  const s = STATUS_BADGE[selected.status] || STATUS_BADGE.generating
-                  return <div style={{ fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: 400, padding: '3px 8px', borderRadius: 20, ...s }}>{STATUS_LABELS[selected.status]}</div>
+                  const sc = getStatusConfig(selected.status)
+                  return <div style={{ fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: 400, padding: '3px 8px', borderRadius: 20, background: sc.bg, color: sc.colorAlt, border: sc.border }}>{STATUS_LABELS[selected.status]}</div>
                 })()}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>

@@ -5,6 +5,8 @@ import { GeneratingModal } from './GeneratingModal'
 import { GeneratePostModal } from './GeneratePostModal'
 import type { Post, BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
+import { useGeneratePost } from '@/hooks/useGeneratePost'
+import { useLanguage } from '@/lib/i18n/context'
 
 const STEPS = [
   'Analyzing brand identity…',
@@ -15,8 +17,6 @@ const STEPS = [
 ]
 
 export function OverviewPendingPost({ posts }: { posts: Post[] }) {
-  const [generating, setGenerating] = useState(false)
-  const [step, setStep]             = useState(STEPS[0])
   const [showAll, setShowAll]       = useState(false)
   const [visibleCount, setVisibleCount] = useState(4)
   const [showModal, setShowModal]   = useState(false)
@@ -24,12 +24,19 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
   const scrollWrapperRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
+  const { t } = useLanguage()
+
+  const { generating, genStep, generatePost } = useGeneratePost(
+    STEPS,
+    () => { toast.success('Post ready for review.'); router.refresh() },
+    (msg) => toast.error(msg),
+  )
+
   useEffect(() => {
     if (!showModal) return
     fetch('/api/brand-brain/assets').then(r => r.ok ? r.json() : []).then(d => setBrandAssets(Array.isArray(d) ? d : [])).catch(() => {})
   }, [showModal])
 
-  // Dynamically calculate how many full cards fit in the scroll wrapper
   useEffect(() => {
     const el = scrollWrapperRef.current
     if (!el) return
@@ -45,48 +52,6 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
     return () => ro.disconnect()
   }, [])
 
-  async function generatePost(config: { assetMode: 'original' | 'auto' | 'specific' | 'composite'; assetUrl?: string; assetName?: string; assetType?: string; assetDescription?: string; scenicAssetUrl?: string; scenicAssetName?: string; scenicAssetDescription?: string; productAssetUrl?: string; productAssetName?: string; productAssetDescription?: string }) {
-    setShowModal(false)
-    setGenerating(true)
-    setStep(STEPS[0])
-    let stepIdx = 0
-    const stepInterval = setInterval(() => {
-      stepIdx = Math.min(stepIdx + 1, STEPS.length - 1)
-      setStep(STEPS[stepIdx])
-    }, 18000)
-
-    try {
-      const res = await fetch('/api/generate/pipeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      })
-      if (!res.ok) {
-        const e = await res.json()
-        throw new Error(e.error || 'Generation failed')
-      }
-      const { post_id } = await res.json()
-
-      const pollInterval = setInterval(async () => {
-        try {
-          const s = await fetch(`/api/posts/${post_id}/status`)
-          const d = await s.json()
-          if (d.status === 'pending_review' || d.status === 'failed') {
-            clearInterval(pollInterval)
-            clearInterval(stepInterval)
-            setGenerating(false)
-            if (d.status === 'pending_review') { toast.success('Post ready for review.'); router.refresh() }
-            else toast.error('Generation failed.')
-          }
-        } catch { /* ignore */ }
-      }, 3000)
-    } catch (err: unknown) {
-      clearInterval(stepInterval)
-      toast.error(err instanceof Error ? err.message : 'Generation failed')
-      setGenerating(false)
-    }
-  }
-
   /* ── Empty state ── */
   if (posts.length === 0) {
     return (
@@ -94,11 +59,11 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
         {showModal && (
           <GeneratePostModal
             brandAssets={brandAssets}
-            onGenerate={generatePost}
+            onGenerate={(config) => { setShowModal(false); generatePost(config) }}
             onClose={() => setShowModal(false)}
           />
         )}
-        {generating && <GeneratingModal step={step} />}
+        {generating && <GeneratingModal step={genStep} />}
         <div style={{
           height: '100%', boxSizing: 'border-box',
           borderRadius: 20,
@@ -117,10 +82,10 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-syne)', fontSize: 16, fontWeight: 700, color: 'var(--parchment)', marginBottom: 7, letterSpacing: '-0.02em' }}>
-              No posts pending review
+              {t('overview.noPendingPosts')}
             </div>
             <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 300, fontFamily: 'var(--font-ibm)' }}>
-              Generate one and Lumen will write, design, and prepare it for you automatically.
+              {t('overview.noPendingDesc')}
             </p>
           </div>
           <button
@@ -136,7 +101,7 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
             }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-            Generate Post
+            {t('posts.generatePost')}
           </button>
         </div>
         <style>{`@keyframes ov-blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
@@ -150,18 +115,15 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
       {showModal && (
         <GeneratePostModal
           brandAssets={brandAssets}
-          onGenerate={generatePost}
+          onGenerate={(config) => { setShowModal(false); generatePost(config) }}
           onClose={() => setShowModal(false)}
         />
       )}
-      {generating && <GeneratingModal step={step} />}
+      {generating && <GeneratingModal step={genStep} />}
 
       <style>{`.ov-extra-btns { display: flex; } @media (max-width: 767px) { .ov-extra-btns { display: none !important; } }`}</style>
 
-      {/* Single flex row — fills all remaining height, cards derive width from height via aspect-ratio */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 10, alignItems: 'stretch' }}>
-
-        {/* Cards — exactly as many as fit, no partial cards */}
         <div ref={scrollWrapperRef} style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
           <div style={{ height: '100%', display: 'flex', gap: 10 }}>
             {(showAll ? posts : posts.slice(0, visibleCount)).map(post => (
@@ -191,7 +153,6 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
                   </div>
                 )}
 
-                {/* Bottom overlay — buttons */}
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)', padding: '32px 8px 8px', display: 'flex', gap: 6 }}>
                   <button
                     onClick={e => { e.stopPropagation(); router.push(`/dashboard/post/${post.id}`) }}
@@ -217,7 +178,6 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
           </div>
         </div>
 
-        {/* Right panel: New post + Show more — same height as cards, hidden on mobile */}
         <div className="ov-extra-btns" style={{ flexShrink: 0, gap: 10, alignItems: 'stretch', height: '100%' }}>
           <button
             onClick={() => setShowModal(true)}

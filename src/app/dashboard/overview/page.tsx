@@ -5,13 +5,11 @@ import { OverviewGenerateButton } from '@/components/dashboard/OverviewGenerateB
 import { OverviewSearch } from '@/components/dashboard/OverviewSearch'
 import type { Post } from '@/types'
 import { t as tr, type LangCode } from '@/lib/i18n/translations'
-// penis
 
 export default async function OverviewPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  //picus
 
   const cookieStore = await cookies()
   const lang = (cookieStore.get('lumen-lang')?.value ?? 'en') as LangCode
