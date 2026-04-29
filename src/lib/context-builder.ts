@@ -79,10 +79,13 @@ export async function buildBrandContext(
     .eq('source', 'user_published')
     .eq('approved', true)
     .order('performance_score', { ascending: false })
-    .limit(3)
+    .limit(5)
 
   const userEx: PromptExample[] = userExamples || []
-  const needed = 3 - userEx.length
+  // Use up to 5 total examples when the user has a strong publish history (≥3),
+  // otherwise fall back to 3 so seed examples don't dilute a thin history.
+  const totalTarget = userEx.length >= 3 ? 5 : 3
+  const needed = totalTarget - userEx.length
   const excludeIds = userEx.map(e => e.id)
 
   // 2. Fill remaining slots with seed examples
