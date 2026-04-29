@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { PostsClient } from '@/components/dashboard/PostsClient'
 import type { Post, BrandAsset } from '@/types'
 
@@ -10,9 +10,10 @@ export default async function PostsPage({
   searchParams: Promise<{ q?: string; page?: string; filter?: string }>
 }) {
   const { q, page: pageParam, filter: filterParam } = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) return null
+
+  const supabase = await createClient()
 
   const filter = filterParam || 'all'
   const page   = Math.max(1, parseInt(pageParam || '1', 10))

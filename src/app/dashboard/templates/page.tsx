@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { seedUserDefaultTemplate } from '@/lib/renderer'
 import { TemplatesClient } from '@/components/dashboard/TemplatesClient'
@@ -7,9 +7,10 @@ import { TemplatesClient } from '@/components/dashboard/TemplatesClient'
 export const metadata = { title: 'Templates — Lumen' }
 
 export default async function TemplatesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
+
+  const supabase = await createClient()
 
   // Ensure user has at least one library template (no-op if DB migration not run yet)
   try { await seedUserDefaultTemplate(user.id) } catch { /* migration pending */ }

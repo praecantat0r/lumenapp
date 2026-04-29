@@ -3,8 +3,12 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { PostCard } from './PostCard'
+import dynamic from 'next/dynamic'
 import { GeneratingModal } from './GeneratingModal'
-import { GeneratePostModal } from './GeneratePostModal'
+const GeneratePostModal = dynamic(
+  () => import('./GeneratePostModal').then(m => ({ default: m.GeneratePostModal })),
+  { ssr: false },
+)
 import type { Post, BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/lib/i18n/context'
@@ -93,91 +97,6 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
         />
       )}
       {generating && <GeneratingModal step={genStep} />}
-      <style>{`
-        .pt-chip {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 6px 14px; font-size: 12px; font-weight: 600;
-          color: var(--muted); cursor: pointer; border: 1px solid transparent;
-          background: transparent; border-radius: 9999px;
-          transition: all .15s; font-family: var(--font-ibm); white-space: nowrap;
-        }
-        .pt-chip:hover { color: var(--parchment); background: rgba(255,255,255,0.05); }
-        .pt-chip.pt-active { color: var(--parchment); background: rgba(255,255,255,0.07); border-color: rgba(78,69,56,0.35); }
-        @keyframes pt-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        .pt-grid { animation: pt-fadein .3s ease both; }
-        @keyframes pt-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-
-        .pt-page-btn {
-          display: inline-flex; align-items: center; justify-content: center;
-          width: 32px; height: 32px; border-radius: 8px;
-          background: transparent; border: 1px solid rgba(78,69,56,0.35);
-          color: var(--sand); cursor: pointer; font-size: 13px;
-          font-family: var(--font-ibm); transition: all .15s;
-        }
-        .pt-page-btn:hover:not(:disabled) { border-color: rgba(212,168,75,.35); color: var(--parchment); }
-        .pt-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .pt-page-btn.pt-page-active { background: rgba(212,168,75,.12); border-color: rgba(212,168,75,.35); color: var(--candle); font-weight: 700; }
-
-        /* ── Responsive grid ── */
-        @media (max-width: 1024px) { .pt-grid { grid-template-columns: repeat(3,1fr) !important; } }
-        @media (max-width: 767px)  { .pt-grid { grid-template-columns: repeat(2,1fr) !important; } }
-        @media (max-width: 480px)  { .pt-grid { grid-template-columns: 1fr !important; } }
-
-        /* ── Topbar ── */
-        @media (max-width: 767px) {
-          .pt-topbar { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; padding: 16px !important; }
-          .pt-topbar > div:last-child { width: 100%; display: flex; gap: 8px; }
-          .pt-topbar > div:last-child > button { flex: 1; justify-content: center; }
-        }
-
-        /* ── Filter bar ── */
-        @media (max-width: 767px) {
-          .pt-filterbar { flex-direction: column !important; gap: 10px !important; padding: 10px 16px !important; }
-          .pt-chips-row { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; flex-shrink: 0; scrollbar-width: none; }
-          .pt-chips-row::-webkit-scrollbar { display: none; }
-          .pt-chips-row > button { flex-shrink: 0; }
-          .pt-search-wrap { width: 100%; }
-          .pt-search-input { width: 100% !important; box-sizing: border-box; }
-        }
-
-        /* ── Detail panel ── */
-        @media (max-width: 767px) {
-          .pt-detail-panel { width: 100% !important; }
-        }
-
-        /* ── Light mode overrides ── */
-        [data-theme="light"] .pt-chip { color: var(--muted); }
-        [data-theme="light"] .pt-chip:hover { color: var(--parchment); background: rgba(0,0,0,0.04); }
-        [data-theme="light"] .pt-chip.pt-active { color: var(--parchment); background: var(--surface-2); border-color: var(--border); }
-        [data-theme="light"] .pt-gen-btn {
-          background: rgba(182,141,64,0.12) !important;
-          border-color: rgba(182,141,64,0.3) !important;
-          color: var(--ember) !important;
-        }
-        [data-theme="light"] .pt-new-btn {
-          background: var(--candle) !important;
-          color: #ffffff !important;
-        }
-        [data-theme="light"] .pt-new-btn:hover {
-          background: var(--ember) !important;
-        }
-        [data-theme="light"] .pt-search-input {
-          background: var(--surface-2) !important;
-          border-color: var(--border) !important;
-          color: var(--parchment) !important;
-        }
-        [data-theme="light"] .pt-section-label { color: var(--muted); }
-        [data-theme="light"] .pt-section-label::after { background: var(--border); }
-        [data-theme="light"] .pc-card {
-          border-color: rgba(210,197,179,0.5) !important;
-          box-shadow: 0 1px 8px rgba(0,0,0,0.06) !important;
-        }
-        [data-theme="light"] .pc-card:hover {
-          box-shadow: 0 8px 28px rgba(0,0,0,0.09) !important;
-          border-color: rgba(182,141,64,0.2) !important;
-        }
-      `}</style>
-
       {/* ── Topbar ── */}
       <div className="pt-topbar" style={{
         borderBottom: '1px solid rgba(78,69,56,0.25)',

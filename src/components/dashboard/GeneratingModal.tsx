@@ -1,22 +1,26 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useLanguage } from '@/lib/i18n/context'
 
-const STEPS = [
-  { label: 'Analyzing brand identity…',   duration: 8 },
-  { label: 'Crafting visual concept…',    duration: 20 },
-  { label: 'Generating image…',           duration: 60 },
-  { label: 'Writing caption…',            duration: 15 },
-  { label: 'Composing final design…',     duration: 15 },
-]
+const DURATIONS = [8, 20, 60, 15, 15]
 
 interface Props {
   step: string
 }
 
 export function GeneratingModal({ step }: Props) {
+  const { t } = useLanguage()
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
+
+  const STEPS = [
+    { label: t('posts.genStep1'), duration: DURATIONS[0] },
+    { label: t('posts.genStep2'), duration: DURATIONS[1] },
+    { label: t('posts.genStep3'), duration: DURATIONS[2] },
+    { label: t('posts.genStep4'), duration: DURATIONS[3] },
+    { label: t('posts.genStep5'), duration: DURATIONS[4] },
+  ]
 
   const modal = (
     <div style={{
@@ -57,7 +61,7 @@ export function GeneratingModal({ step }: Props) {
         {/* Title */}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 20, color: 'var(--parchment)', letterSpacing: '-0.02em', marginBottom: 8 }}>
-            Generating post
+            {t('posts.generatingPost')}
           </div>
           <div style={{ fontFamily: 'var(--font-ibm)', fontWeight: 300, fontSize: 13, color: 'var(--sand)', letterSpacing: '0.02em', minHeight: 20, transition: 'opacity 0.4s' }}>
             {step}

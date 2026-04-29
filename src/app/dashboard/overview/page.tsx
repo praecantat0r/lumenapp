@@ -1,16 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { OverviewPendingPost } from '@/components/dashboard/OverviewPendingPost'
 import { OverviewGenerateButton } from '@/components/dashboard/OverviewGenerateButton'
 import { OverviewSearch } from '@/components/dashboard/OverviewSearch'
-import type { Post } from '@/types'
+import type { Post, BrandAsset } from '@/types'
 import { t as tr, type LangCode } from '@/lib/i18n/translations'
 
 export default async function OverviewPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) return null
 
+  const supabase = await createClient()
   const cookieStore = await cookies()
   const lang = (cookieStore.get('lumen-lang')?.value ?? 'en') as LangCode
   const t = (key: string) => tr(lang, key)
@@ -26,12 +26,12 @@ export default async function OverviewPage() {
     { data: publishedThisMonth },
     { data: pendingPosts },
     { data: weekPosts },
-    { count: pendingCount },
+    { data: brandAssetsData },
   ] = await Promise.all([
     supabase.from('posts').select('id,analytics').eq('user_id', user.id).eq('status', 'published').gte('published_at', monthStart),
     supabase.from('posts').select('*').eq('user_id', user.id).eq('status', 'pending_review').order('created_at', { ascending: false }),
     supabase.from('posts').select('published_at,scheduled_for').eq('user_id', user.id).gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString()),
-    supabase.from('posts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'pending_review'),
+    supabase.from('brand_assets').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
   ])
 
   const postsThisMonth  = publishedThisMonth?.length ?? 0
@@ -69,59 +69,6 @@ export default async function OverviewPage() {
 
   return (
     <>
-      <style>{`
-        @keyframes ov-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        .ov-r1{animation:ov-in .35s ease both .03s}
-        .ov-r2{animation:ov-in .35s ease both .10s}
-        .ov-r3{animation:ov-in .35s ease both .17s}
-        .hide-scroll::-webkit-scrollbar{display:none}
-        .hide-scroll{-ms-overflow-style:none;scrollbar-width:none}
-        .ov-ghost-btn{
-          display:inline-flex;align-items:center;justify-content:center;gap:5px;
-          padding:6px 14px;border-radius:9999px;
-          border:1px solid rgba(78,69,56,0.28);
-          color:var(--sand);font-size:11px;font-weight:500;
-          text-decoration:none;transition:all 0.15s;
-          font-family:var(--font-ibm);
-        }
-        .ov-ghost-btn:hover{border-color:rgba(182,141,64,0.38);color:var(--parchment)}
-        .ov-cal-row:hover{background:rgba(182,141,64,0.06)!important}
-        .ov-adj:hover{background:rgba(182,141,64,0.22)!important}
-        .ov-callink:hover{color:var(--candle)!important}
-
-
-        /* ── Responsive ── */
-        @media (max-width: 1024px) {
-          .ov-kpi-grid  { grid-template-columns: 1fr !important; }
-          .ov-row3-grid { grid-template-columns: 1fr !important; }
-          .ov-weekly    { display: none !important; }
-        }
-        @media (max-width: 767px) {
-          .ov-main {
-            overflow-y: auto !important; overflow-x: hidden !important;
-            padding: 12px 12px 32px !important;
-          }
-          .ov-bento-rows { overflow: visible !important; height: auto !important; }
-          .ov-r1.ov-row { flex: none !important; margin-bottom: 12px; }
-          .ov-r2.ov-row { flex: none !important; height: 220px; margin-bottom: 12px; }
-          .ov-r3.ov-row { flex: none !important; }
-          .ov-topbar {
-            flex-wrap: wrap !important; gap: 8px !important;
-            padding: 16px 16px !important; align-items: flex-start !important;
-          }
-          .ov-topbar-actions {
-            width: 100%; display: flex; gap: 8px; align-items: center; flex-direction: column;
-          }
-          .ov-search-row { width: 100%; display: flex; gap: 8px; align-items: center; }
-          .ov-search-wrap { flex: 1; min-width: 0; }
-          .ov-ghost-btn { width: auto; align-self: flex-start; font-size: 10px; padding: 5px 10px; }
-        }
-        @media (max-width: 480px) {
-          .ov-main { padding: 8px 8px 24px !important; }
-          .ov-r2.ov-row { height: 200px; }
-        }
-      `}</style>
-
       {/* ── Topbar ── */}
       <div className="ov-r1 ov-topbar" style={{
         padding: '24px 32px', flexShrink: 0, borderBottom: '1px solid rgba(78,69,56,0.25)',
@@ -135,7 +82,7 @@ export default async function OverviewPage() {
         <div className="ov-topbar-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div className="ov-search-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div className="ov-search-wrap"><OverviewSearch /></div>
-            <OverviewGenerateButton />
+            <OverviewGenerateButton brandAssets={(brandAssetsData ?? []) as BrandAsset[]} />
           </div>
           <a href="/dashboard/posts" className="ov-ghost-btn">{t('overview.viewAllPosts')}</a>
         </div>
@@ -232,8 +179,8 @@ export default async function OverviewPage() {
                 {t('overview.pendingReview')}
               </h2>
               <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>
-                {pendingCount !== null && pendingCount > 0
-                  ? t('overview.pendingItems').replace('{n}', String(pendingCount)).replace('{s}', pendingCount > 1 ? 's' : '')
+                {pendingPostList.length > 0
+                  ? t('overview.pendingItems').replace('{n}', String(pendingPostList.length)).replace('{s}', pendingPostList.length > 1 ? 's' : '')
                   : t('overview.allClear')}
               </p>
             </div>
@@ -242,7 +189,7 @@ export default async function OverviewPage() {
             </a>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <OverviewPendingPost posts={pendingPostList as Post[]} />
+            <OverviewPendingPost posts={pendingPostList as Post[]} brandAssets={(brandAssetsData ?? []) as BrandAsset[]} />
           </div>
         </div>
 

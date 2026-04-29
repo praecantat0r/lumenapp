@@ -273,7 +273,7 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
   const [editingPhoto, setEditingPhoto] = useState<ProductPhoto | null>(null)
   const [editorSaving, setEditorSaving] = useState(false)
 
-  const pollingRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map())
+  const pollingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const selectedPhoto = photos.find(p => p.id === selectedId) ?? null
 
@@ -285,29 +285,38 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
   const startPolling = useCallback((photoId: string) => {
     if (pollingRef.current.has(photoId)) return
     let failures = 0
-    const t = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/product-photos/${photoId}/status`)
-        if (!res.ok) {
-          if (++failures >= 5) { clearInterval(t); pollingRef.current.delete(photoId) }
-          return
-        }
-        failures = 0
-        const { status, image_url } = await res.json()
-        if (status === 'done' || status === 'failed') {
-          clearInterval(t)
-          pollingRef.current.delete(photoId)
-          setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, status, image_url } : p))
-          if (status === 'done') router.refresh()
-        }
-      } catch { /* ignore */ }
-    }, 3000)
-    pollingRef.current.set(photoId, t)
+    let delay = 3000
+    const MAX_DELAY = 15000
+
+    function poll() {
+      const t = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/product-photos/${photoId}/status`)
+          if (!res.ok) {
+            if (++failures >= 5) { pollingRef.current.delete(photoId); return }
+            poll()
+            return
+          }
+          failures = 0
+          const { status, image_url } = await res.json()
+          if (status === 'done' || status === 'failed') {
+            pollingRef.current.delete(photoId)
+            setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, status, image_url } : p))
+            if (status === 'done') router.refresh()
+            return
+          }
+          delay = Math.min(delay * 1.5, MAX_DELAY)
+          poll()
+        } catch { poll() }
+      }, delay)
+      pollingRef.current.set(photoId, t)
+    }
+    poll()
   }, [router])
 
   useEffect(() => {
     photos.filter(p => p.status === 'generating').forEach(p => startPolling(p.id))
-    return () => { pollingRef.current.forEach(t => clearInterval(t)); pollingRef.current.clear() }
+    return () => { pollingRef.current.forEach(t => clearTimeout(t)); pollingRef.current.clear() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─ Generate

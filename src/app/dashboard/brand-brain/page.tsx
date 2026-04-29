@@ -1,11 +1,17 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { BrandBrainClient } from '@/components/brand-brain/BrandBrainClient'
+import { createClient, getUser } from '@/lib/supabase/server'
+import dynamic from 'next/dynamic'
+
+const BrandBrainClient = dynamic(
+  () => import('@/components/brand-brain/BrandBrainClient').then(m => ({ default: m.BrandBrainClient })),
+  { ssr: false },
+)
 
 export default async function BrandBrainPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
+
+  const supabase = await createClient()
 
   const [{ data: bb }, { data: assets }, { data: igConn }] = await Promise.all([
     supabase.from('brand_brains').select('*').eq('user_id', user.id).single(),

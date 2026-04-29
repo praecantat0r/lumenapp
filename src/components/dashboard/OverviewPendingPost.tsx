@@ -1,8 +1,12 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { GeneratingModal } from './GeneratingModal'
-import { GeneratePostModal } from './GeneratePostModal'
+const GeneratePostModal = dynamic(
+  () => import('./GeneratePostModal').then(m => ({ default: m.GeneratePostModal })),
+  { ssr: false },
+)
 import type { Post, BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
 import { useGeneratePost } from '@/hooks/useGeneratePost'
@@ -16,11 +20,10 @@ const STEPS = [
   'Composing final design…',
 ]
 
-export function OverviewPendingPost({ posts }: { posts: Post[] }) {
+export function OverviewPendingPost({ posts, brandAssets }: { posts: Post[]; brandAssets: BrandAsset[] }) {
   const [showAll, setShowAll]       = useState(false)
   const [visibleCount, setVisibleCount] = useState(4)
   const [showModal, setShowModal]   = useState(false)
-  const [brandAssets, setBrandAssets] = useState<BrandAsset[]>([])
   const scrollWrapperRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -31,11 +34,6 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
     () => { toast.success('Post ready for review.'); router.refresh() },
     (msg) => toast.error(msg),
   )
-
-  useEffect(() => {
-    if (!showModal) return
-    fetch('/api/brand-brain/assets').then(r => r.ok ? r.json() : []).then(d => setBrandAssets(Array.isArray(d) ? d : [])).catch(() => {})
-  }, [showModal])
 
   useEffect(() => {
     const el = scrollWrapperRef.current
@@ -104,7 +102,6 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
             {t('posts.generatePost')}
           </button>
         </div>
-        <style>{`@keyframes ov-blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
       </div>
     )
   }
@@ -120,8 +117,6 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
         />
       )}
       {generating && <GeneratingModal step={genStep} />}
-
-      <style>{`.ov-extra-btns { display: flex; } @media (max-width: 767px) { .ov-extra-btns { display: none !important; } }`}</style>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 10, alignItems: 'stretch' }}>
         <div ref={scrollWrapperRef} style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
@@ -210,7 +205,6 @@ export function OverviewPendingPost({ posts }: { posts: Post[] }) {
         </div>
       </div>
 
-      <style>{`@keyframes ov-blink{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
     </div>
   )
 }

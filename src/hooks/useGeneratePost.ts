@@ -47,27 +47,34 @@ export function useGeneratePost(
       const { post_id } = await res.json()
 
       let pollCount = 0
-      const pollInterval = setInterval(async () => {
-        try {
-          pollCount++
-          if (pollCount > MAX_POLL_ATTEMPTS) {
-            clearInterval(pollInterval)
-            clearInterval(stepInterval)
-            setGenerating(false)
-            onError('Generation timed out. Please check your posts.')
-            return
-          }
-          const s = await fetch(`/api/posts/${post_id}/status`)
-          const d = await s.json()
-          if (d.status === 'pending_review' || d.status === 'failed') {
-            clearInterval(pollInterval)
-            clearInterval(stepInterval)
-            setGenerating(false)
-            if (d.status === 'pending_review') onSuccess()
-            else onError('Generation failed.')
-          }
-        } catch { /* ignore network hiccups */ }
-      }, 3000)
+      let delay = 3000
+      const MAX_DELAY = 15000
+
+      function schedulePoll() {
+        setTimeout(async () => {
+          try {
+            pollCount++
+            if (pollCount > MAX_POLL_ATTEMPTS) {
+              clearInterval(stepInterval)
+              setGenerating(false)
+              onError('Generation timed out. Please check your posts.')
+              return
+            }
+            const s = await fetch(`/api/posts/${post_id}/status`)
+            const d = await s.json()
+            if (d.status === 'pending_review' || d.status === 'failed') {
+              clearInterval(stepInterval)
+              setGenerating(false)
+              if (d.status === 'pending_review') onSuccess()
+              else onError('Generation failed.')
+              return
+            }
+            delay = Math.min(delay * 1.5, MAX_DELAY)
+            schedulePoll()
+          } catch { schedulePoll() }
+        }, delay)
+      }
+      schedulePoll()
     } catch (err: unknown) {
       clearInterval(stepInterval)
       onError(err instanceof Error ? err.message : 'Generation failed')

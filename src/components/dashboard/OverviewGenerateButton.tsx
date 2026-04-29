@@ -1,35 +1,35 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { GeneratingModal } from './GeneratingModal'
-import { GeneratePostModal } from './GeneratePostModal'
+const GeneratePostModal = dynamic(
+  () => import('./GeneratePostModal').then(m => ({ default: m.GeneratePostModal })),
+  { ssr: false },
+)
 import type { BrandAsset } from '@/types'
 import toast from 'react-hot-toast'
 import { useGeneratePost } from '@/hooks/useGeneratePost'
+import { useLanguage } from '@/lib/i18n/context'
 
-const STEPS = [
-  'Analyzing brand identity…',
-  'Crafting visual concept…',
-  'Generating image…',
-  'Writing caption…',
-  'Composing final design…',
-]
-
-export function OverviewGenerateButton() {
+export function OverviewGenerateButton({ brandAssets }: { brandAssets: BrandAsset[] }) {
+  const { t } = useLanguage()
   const [showModal, setShowModal] = useState(false)
-  const [brandAssets, setBrandAssets] = useState<BrandAsset[]>([])
   const router = useRouter()
 
+  const steps = [
+    t('posts.genStep1'),
+    t('posts.genStep2'),
+    t('posts.genStep3'),
+    t('posts.genStep4'),
+    t('posts.genStep5'),
+  ]
+
   const { generating, genStep, generatePost } = useGeneratePost(
-    STEPS,
-    () => { toast.success('Post ready for review.'); router.refresh() },
+    steps,
+    () => { toast.success(t('posts.toastReady')); router.refresh() },
     (msg) => toast.error(msg),
   )
-
-  useEffect(() => {
-    if (!showModal) return
-    fetch('/api/brand-brain/assets').then(r => r.ok ? r.json() : []).then(d => setBrandAssets(Array.isArray(d) ? d : [])).catch(() => {})
-  }, [showModal])
 
   return (
     <>
@@ -41,7 +41,6 @@ export function OverviewGenerateButton() {
         />
       )}
       {generating && <GeneratingModal step={genStep} />}
-      <style>{`@keyframes ovg-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       <button
         onClick={() => setShowModal(true)}
         disabled={generating}
@@ -59,7 +58,7 @@ export function OverviewGenerateButton() {
         ) : (
           <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
         )}
-        {generating ? 'Generating…' : 'Generate Post'}
+        {generating ? t('posts.statusGenerating') : t('posts.generatePost')}
       </button>
     </>
   )
