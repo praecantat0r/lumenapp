@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic'
 
 const BrandBrainClient = dynamic(
   () => import('@/components/brand-brain/BrandBrainClient').then(m => ({ default: m.BrandBrainClient })),
-  { ssr: false },
 )
 
 export default async function BrandBrainPage() {
