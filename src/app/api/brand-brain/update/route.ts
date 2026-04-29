@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 import { buildBrandSystemPrompt } from '@/lib/anthropic'
 import { z } from 'zod'
 

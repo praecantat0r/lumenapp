@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 
 function parseSignedRequest(signedRequest: string, secret: string) {
   const [encodedSig, payload] = signedRequest.split('.')

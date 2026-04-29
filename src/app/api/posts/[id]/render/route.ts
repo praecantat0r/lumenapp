@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 import { renderPostServer } from '@/lib/renderer'
 
 export async function POST(

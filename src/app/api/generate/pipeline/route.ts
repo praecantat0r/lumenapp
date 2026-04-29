@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getLimits, monthStart } from '@/lib/plans'
 import { VALIDATION_THRESHOLD, VALIDATION_THRESHOLD_ASSET, VALIDATION_HARD_FAIL } from '@/lib/constants'

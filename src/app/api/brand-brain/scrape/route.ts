@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { scrapeWebsite } from '@/lib/scraper'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const PRIVATE_IP = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/
