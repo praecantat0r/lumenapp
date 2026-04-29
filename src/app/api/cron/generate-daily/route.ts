@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateCaption } from '@/lib/openai'
-import { generateOriginalImagePrompt, validatePost } from '@/lib/anthropic'
+import { createServiceClient } from '@/lib/supabase/service'
+import { generateCaption, generateOriginalImagePrompt, validatePost } from '@/lib/anthropic'
 import { buildBrandContext } from '@/lib/context-builder'
 import { generateImage } from '@/lib/nanobanana'
-import { renderPostServer, getOrSeedTemplateId } from '@/lib/renderer'
+import { renderPostServer, seedUserDefaultTemplate } from '@/lib/renderer'
 import { rateLimit } from '@/lib/rate-limit'
 import { getLimits, monthStart } from '@/lib/plans'
+import { VALIDATION_THRESHOLD, VALIDATION_HARD_FAIL } from '@/lib/constants'
 import type { BrandBrain } from '@/types'
 
 export async function GET(req: NextRequest) {
@@ -78,6 +79,8 @@ export async function GET(req: NextRequest) {
         .single()
       if (!igConn) continue
 
+      const serviceClient = createServiceClient()
+
       // Create post and run pipeline
       const { data: post } = await supabase
         .from('posts')
@@ -92,9 +95,20 @@ export async function GET(req: NextRequest) {
         .eq('user_id', bb.user_id)
         .not('image_prompt', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(20)
       const recentImagePrompts = (recentPostsData || [])
         .map((p: { image_prompt: string | null }) => p.image_prompt)
+        .filter(Boolean) as string[]
+
+      const { data: recentShotStylePosts } = await supabase
+        .from('posts')
+        .select('generation_metadata')
+        .eq('user_id', bb.user_id)
+        .not('generation_metadata->shot_style', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(3)
+      const recentShotStyles = (recentShotStylePosts || [])
+        .map((p: any) => p.generation_metadata?.shot_style)
         .filter(Boolean) as string[]
 
       const brandContext = await buildBrandContext(bb.user_id, bb as BrandBrain)
@@ -129,10 +143,11 @@ export async function GET(req: NextRequest) {
       let validationFeedback: string | undefined
       let validationScore = 0
       let validationAttempts = 0
+      let selectedShotStyle: string | undefined
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         validationAttempts = attempt
-        ;({ image_prompt, template_layers, visual_concept } = await generateOriginalImagePrompt(bb as BrandBrain, recentImagePrompts, brandContext, validationFeedback, postMode))
+        ;({ image_prompt, template_layers, visual_concept, selectedShotStyle } = await generateOriginalImagePrompt(bb as BrandBrain, recentImagePrompts, brandContext, validationFeedback, postMode, recentShotStyles))
         ;({ caption, hashtags } = await generateCaption(bb as BrandBrain, visual_concept, brandContext, validationFeedback))
 
         let validation: { score: number; feedback: string }
@@ -143,26 +158,74 @@ export async function GET(req: NextRequest) {
         }
 
         validationScore = validation.score
-        if (validationScore >= 0.7) break
+        if (validationScore >= VALIDATION_THRESHOLD) break
         validationFeedback = validation.feedback
       }
 
-      if (validationScore < 0.7) {
-        await supabase.from('posts').update({
-          image_prompt, template_layers, caption, hashtags,
-          status: 'failed',
-          generation_metadata: { source: 'cron', bb_id: bb.id, validation_failed: true, validation_score: validationScore, validation_attempts: validationAttempts, validation_feedback: validationFeedback },
-        }).eq('id', post.id)
+      if (validationScore < VALIDATION_HARD_FAIL) {
+        const errorMsg = `Brand validation failed after ${validationAttempts} attempts. Score: ${validationScore}. ${validationFeedback ?? ''}`
+        await Promise.all([
+          supabase.from('posts').update({
+            image_prompt, template_layers, caption, hashtags,
+            status: 'failed',
+            generation_metadata: { source: 'cron', bb_id: bb.id, validation_failed: true, validation_score: validationScore, validation_attempts: validationAttempts, validation_feedback: validationFeedback },
+          }).eq('id', post.id),
+          serviceClient.from('profiles').update({ last_cron_error: errorMsg, last_cron_error_at: new Date().toISOString() }).eq('id', bb.user_id),
+        ])
         console.error(`Cron: post for user ${bb.user_id} failed brand validation after ${validationAttempts} attempts. Score: ${validationScore}. Feedback: ${validationFeedback}`)
         continue
       }
 
       await supabase.from('posts').update({ image_prompt, template_layers, caption, hashtags }).eq('id', post.id)
 
-      const image_url = await generateImage(image_prompt, [])
+      const negativeConstraints: string[] = [
+        'no underglow',
+        'no neon ground lighting',
+        'no light strips or light pools beneath objects',
+        'no unrelated props',
+        'no bottles, jars, or containers unless they are the explicit subject of this post',
+      ]
+      if (bb.include_people === false) {
+        negativeConstraints.push('no people', 'no humans', 'no persons', 'no figures', 'no hands', 'no body parts', 'no silhouettes')
+      }
+      const constrainedPrompt = `${image_prompt} ${negativeConstraints.join(', ')}.`
+
+      const image_url = await generateImage(constrainedPrompt, [])
       await supabase.from('posts').update({ image_url }).eq('id', post.id)
 
-      const template_id = await getOrSeedTemplateId()
+      // ── Template selection: round-robin across user's active templates ──
+      const { data: userTemplates } = await serviceClient
+        .from('templates')
+        .select('id, name, canvas_json, width, height')
+        .eq('user_id', bb.user_id)
+        .eq('is_user_template', true)
+        .eq('use_for_generation', true)
+        .eq('is_active', true)
+
+      if (!userTemplates?.length) {
+        await seedUserDefaultTemplate(bb.user_id)
+      }
+
+      let selectedPoolTemplate: any = null
+      if (userTemplates?.length) {
+        const { data: recentMeta } = await supabase
+          .from('posts')
+          .select('generation_metadata')
+          .eq('user_id', bb.user_id)
+          .not('generation_metadata->pool_template_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(userTemplates.length)
+
+        const recentlyUsedIds = new Set(
+          (recentMeta || []).map((p: any) => p.generation_metadata?.pool_template_id).filter(Boolean)
+        )
+
+        selectedPoolTemplate =
+          userTemplates.find((t: { id: string }) => !recentlyUsedIds.has(t.id)) ??
+          userTemplates[0]
+      }
+
+      const template_id = selectedPoolTemplate?.id ?? await seedUserDefaultTemplate(bb.user_id)
       const canvas_overrides = {
         'background-image': { src: image_url },
         'title':            { text: (template_layers as any).title || '' },
@@ -175,12 +238,22 @@ export async function GET(req: NextRequest) {
       await supabase.from('posts').update({
         template_id, canvas_overrides, render_url,
         status: 'pending_review',
-        generation_metadata: { source: 'cron', bb_id: bb.id, visual_concept, post_mode: postMode, validation_score: validationScore, validation_attempts: validationAttempts },
+        generation_metadata: {
+          source: 'cron', bb_id: bb.id, visual_concept, post_mode: postMode,
+          shot_style: selectedShotStyle ?? null,
+          validation_score: validationScore, validation_attempts: validationAttempts,
+          pool_template_id: selectedPoolTemplate?.id ?? null,
+          pool_template_name: selectedPoolTemplate?.name ?? null,
+        },
       }).eq('id', post.id)
 
       processed++
     } catch (err) {
       console.error(`Cron generation failed for user ${bb.user_id}:`, err)
+      try {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        await createServiceClient().from('profiles').update({ last_cron_error: errorMsg, last_cron_error_at: new Date().toISOString() }).eq('id', bb.user_id)
+      } catch { /* best-effort */ }
     }
   }
 

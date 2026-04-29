@@ -27,12 +27,19 @@ export default async function OverviewPage() {
     { data: pendingPosts },
     { data: weekPosts },
     { count: pendingCount },
+    { data: profileData },
   ] = await Promise.all([
     supabase.from('posts').select('id,analytics').eq('user_id', user.id).eq('status', 'published').gte('published_at', monthStart),
     supabase.from('posts').select('*').eq('user_id', user.id).eq('status', 'pending_review').order('created_at', { ascending: false }),
     supabase.from('posts').select('published_at,scheduled_for').eq('user_id', user.id).gte('created_at', monday.toISOString()).lte('created_at', sunday.toISOString()),
     supabase.from('posts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'pending_review'),
+    supabase.from('profiles').select('last_cron_error, last_cron_error_at').eq('id', user.id).single(),
   ])
+
+  const cronError = profileData?.last_cron_error_at
+    && (Date.now() - new Date(profileData.last_cron_error_at).getTime()) < 48 * 60 * 60 * 1000
+    ? profileData.last_cron_error as string | null
+    : null
 
   const postsThisMonth  = publishedThisMonth?.length ?? 0
   const totalReach      = (publishedThisMonth ?? []).reduce((s: number, p: { analytics?: unknown }) =>
@@ -140,6 +147,19 @@ export default async function OverviewPage() {
           <a href="/dashboard/posts" className="ov-ghost-btn">{t('overview.viewAllPosts')}</a>
         </div>
       </div>
+
+      {/* ── Cron error banner ── */}
+      {cronError && (
+        <div style={{
+          background: 'rgba(220,60,40,0.12)', border: '1px solid rgba(220,60,40,0.35)',
+          borderRadius: 10, padding: '10px 20px', margin: '10px 32px 0',
+          display: 'flex', alignItems: 'center', gap: 10,
+          fontSize: 13, color: 'var(--parchment)',
+        }}>
+          <span style={{ fontSize: 16 }}>⚠</span>
+          <span><strong style={{ color: '#f87171' }}>Automatic post generation failed.</strong> Your last scheduled post could not be created. <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{cronError}</span></span>
+        </div>
+      )}
 
       {/* ── Main — proportional rows, always fits viewport with no scroll ── */}
       <div className="ov-main" style={{

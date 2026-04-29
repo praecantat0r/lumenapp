@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getLimits, monthStart } from '@/lib/plans'
+import { VALIDATION_THRESHOLD, VALIDATION_THRESHOLD_ASSET, VALIDATION_HARD_FAIL } from '@/lib/constants'
 
 export const maxDuration = 300
 import { createServiceClient } from '@/lib/supabase/service'
-import { generateCaption, generateOriginalImagePrompt, generateAssetImagePrompt, generateCompositeImagePrompt, validatePost, analyzeLocationPhoto, type AssetGuidance } from '@/lib/anthropic'
+import { generateCaption, generateOriginalImagePrompt, generateAssetImagePrompt, generateCompositeImagePrompt, validatePost, analyzeLocationPhoto, analyzeProductAsset, type AssetGuidance } from '@/lib/anthropic'
 import { buildBrandContext } from '@/lib/context-builder'
 import { generateImage, prefetchReferenceImages, type ImagePart } from '@/lib/nanobanana'
 import { renderPostServer, seedUserDefaultTemplate, SEED_CANVAS_JSON } from '@/lib/renderer'
@@ -100,19 +101,51 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Analyze product physical appearance with Claude Vision so Gemini gets a precise verbal
+  // description of shape, color, materials, and finish — not just the reference image alone.
+  // Without this, Gemini may change colors, simplify labels, or alter the product's form.
+  let productPhysicalDescription: string | undefined
+  let productPhysicalDescriptionComposite: string | undefined
+  if (assetMode === 'specific' && selectedAssetUrl && selectedAssetType === 'product_photo') {
+    try {
+      productPhysicalDescription = await analyzeProductAsset(selectedAssetUrl)
+    } catch {
+      // Non-fatal — prompt will rely on reference image alone
+    }
+  }
+  if (assetMode === 'composite' && productAssetUrl) {
+    try {
+      productPhysicalDescriptionComposite = await analyzeProductAsset(productAssetUrl)
+    } catch {
+      // Non-fatal — composite prompt will rely on reference image alone
+    }
+  }
+
   // Resolve reference image URLs for NanoBanana.
   // All asset types (including place_photo) are now passed — the image prompt for place_photo
   // explicitly tells Gemini to use the reference as the environment, not as a framed object.
   let assetUrls: string[] = []
+  let autoAssetTypeSummary: string | undefined
   if (assetMode === 'specific' && selectedAssetUrl) {
     assetUrls = [selectedAssetUrl]
   } else if (assetMode === 'auto') {
     const { data: assets } = await supabase
       .from('brand_assets')
-      .select('public_url')
+      .select('public_url, asset_type, name')
       .eq('user_id', user.id)
       .limit(5)
     assetUrls = (assets || []).map((a: { public_url: string }) => a.public_url)
+    // Build a type summary so Claude knows what kind of assets it's working with
+    if (assets?.length) {
+      const counts: Record<string, number> = {}
+      for (const a of assets) {
+        const t = (a as { asset_type?: string }).asset_type || 'other'
+        counts[t] = (counts[t] || 0) + 1
+      }
+      autoAssetTypeSummary = Object.entries(counts)
+        .map(([t, n]) => `${n}× ${t.replace(/_/g, ' ')}`)
+        .join(', ')
+    }
   } else if (assetMode === 'composite' && scenicAssetUrl && productAssetUrl) {
     // Product FIRST — Gemini gives most weight to the first reference image,
     // so we want the product (the hero) to be image 1. The scene goes second
@@ -123,11 +156,11 @@ export async function POST(req: NextRequest) {
   // Build asset guidance for the Claude prompt
   const assetGuidance: AssetGuidance | undefined =
     assetMode === 'specific' && selectedAssetUrl
-      ? { url: selectedAssetUrl, name: selectedAssetName, type: selectedAssetType || 'photo', mode: 'specific', locationDescription, description: selectedAssetDescription }
+      ? { url: selectedAssetUrl, name: selectedAssetName, type: selectedAssetType || 'photo', mode: 'specific', locationDescription, description: selectedAssetDescription, productPhysicalDescription }
       : assetMode === 'auto' && assetUrls.length > 0
-      ? { url: assetUrls[0], name: 'brand assets', type: 'photo', mode: 'auto' }
+      ? { url: assetUrls[0], name: 'brand assets', type: 'photo', mode: 'auto', assetTypeSummary: autoAssetTypeSummary }
       : assetMode === 'composite' && scenicAssetUrl && productAssetUrl
-      ? { url: scenicAssetUrl, name: scenicAssetName, type: 'place_photo', mode: 'composite', locationDescription, description: scenicAssetDescription, productUrl: productAssetUrl, productName: productAssetName, productDescription: productAssetDescription }
+      ? { url: scenicAssetUrl, name: scenicAssetName, type: 'place_photo', mode: 'composite', locationDescription, description: scenicAssetDescription, productUrl: productAssetUrl, productName: productAssetName, productDescription: productAssetDescription, productPhysicalDescriptionComposite }
       : undefined
 
   // Build asset note for the caption writer — concrete facts from user's AI insight fields
@@ -234,9 +267,20 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .not('image_prompt', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(20)
     const recentImagePrompts = (recentPosts || [])
       .map((p: { image_prompt: string | null }) => p.image_prompt)
+      .filter(Boolean) as string[]
+
+    const { data: recentShotStylePosts } = await supabase
+      .from('posts')
+      .select('generation_metadata')
+      .eq('user_id', user.id)
+      .not('generation_metadata->shot_style', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(3)
+    const recentShotStyles = (recentShotStylePosts || [])
+      .map((p: any) => p.generation_metadata?.shot_style)
       .filter(Boolean) as string[]
 
     const MAX_ATTEMPTS = 3
@@ -248,6 +292,7 @@ export async function POST(req: NextRequest) {
     let validationFeedback: string | undefined
     let validationScore = 0
     let validationAttempts = 0
+    let selectedShotStyle: string | undefined
 
     // Track the best attempt in case all fall short of the threshold
     let bestScore = -1
@@ -263,11 +308,11 @@ export async function POST(req: NextRequest) {
 
       try {
         if (assetMode === 'composite' && assetGuidance) {
-          ;({ image_prompt, template_layers, visual_concept } = await generateCompositeImagePrompt(bb as BrandBrain, assetGuidance, validationFeedback))
+          ;({ image_prompt, template_layers, visual_concept, selectedShotStyle } = await generateCompositeImagePrompt(bb as BrandBrain, assetGuidance, recentImagePrompts, brandContext, validationFeedback))
         } else if ((assetMode === 'specific' || assetMode === 'auto') && assetGuidance) {
-          ;({ image_prompt, template_layers, visual_concept } = await generateAssetImagePrompt(bb as BrandBrain, assetGuidance, recentImagePrompts, brandContext, validationFeedback, postMode))
+          ;({ image_prompt, template_layers, visual_concept, selectedShotStyle } = await generateAssetImagePrompt(bb as BrandBrain, assetGuidance, recentImagePrompts, brandContext, validationFeedback, postMode, recentShotStyles))
         } else {
-          ;({ image_prompt, template_layers, visual_concept } = await generateOriginalImagePrompt(bb as BrandBrain, recentImagePrompts, brandContext, validationFeedback, postMode))
+          ;({ image_prompt, template_layers, visual_concept, selectedShotStyle } = await generateOriginalImagePrompt(bb as BrandBrain, recentImagePrompts, brandContext, validationFeedback, postMode, recentShotStyles))
         }
       } catch (err) {
         await save({}, true)
@@ -281,11 +326,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Caption generation failed: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 })
       }
 
-      // Validation only applies to original (fully AI-generated) posts — for asset-based
-      // modes the user supplies their own content so there is no risk of off-brand hallucination.
+      // Original posts: full 5-criterion validation.
+      // Asset posts: lightweight validation — skip brand specificity and depth (can't fairly
+      // evaluate those without knowing the asset), but enforce language and rules.
       const validation = assetMode === 'original'
         ? await validatePost(bb as BrandBrain, { caption, hashtags, visual_concept, image_prompt }, assetNote)
-        : { score: 1, feedback: 'Asset-based post — validation skipped.' }
+        : await validatePost(bb as BrandBrain, { caption, hashtags, visual_concept, image_prompt }, assetNote, ['specificity', 'depth'])
 
       validationScore = validation.score
 
@@ -300,14 +346,15 @@ export async function POST(req: NextRequest) {
         bestValidationFeedback = validation.feedback
       }
 
-      if (validationScore >= 0.6) break
+      const passThreshold = assetMode === 'original' ? VALIDATION_THRESHOLD : VALIDATION_THRESHOLD_ASSET
+      if (validationScore >= passThreshold) break
 
       validationFeedback = validation.feedback
     }
 
     // Use the best attempt regardless of score — validation improves quality via retries
     // but should never block generation entirely. Hard-fail only if something is truly broken.
-    if (bestScore < 0.3) {
+    if (bestScore < VALIDATION_HARD_FAIL) {
       await save({ image_prompt, template_layers, caption, hashtags, generation_metadata: {
         validation_failed: true,
         validation_attempts: validationAttempts,
@@ -323,7 +370,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Restore best attempt content if we didn't exit the loop on a passing score
-    if (validationScore < 0.6) {
+    if (validationScore < VALIDATION_THRESHOLD) {
       image_prompt = bestImagePrompt!
       template_layers = bestTemplateLayers
       visual_concept = bestVisualConcept!
@@ -461,6 +508,7 @@ export async function POST(req: NextRequest) {
           asset_name: selectedAssetName ?? scenicAssetName ?? null,
           visual_concept,
           post_mode: postMode,
+          shot_style: selectedShotStyle ?? null,
           validation_score: validationScore,
           validation_attempts: validationAttempts,
           validation_feedback: bestValidationFeedback ?? null,

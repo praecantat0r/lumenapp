@@ -45,40 +45,42 @@ export interface ValidationResult {
 export async function validatePost(
   brandBrain: BrandBrain,
   post: { caption: string; hashtags: string; visual_concept: string; image_prompt: string },
-  assetContext?: string
+  assetContext?: string,
+  skipCriteria?: Array<'specificity' | 'depth'>
 ): Promise<ValidationResult> {
+  const skip = new Set(skipCriteria ?? [])
+  const assetMode = skip.size > 0
+
   const system = `You are a senior Instagram content strategist reviewing a post for the brand below. Your job is to catch posts that are technically on-topic but still weak — generic, predictable, or forgettable. Be genuinely critical.
 
 ${getBrandProfile(brandBrain)}
 Score each criterion with exactly 0 or 1. No partial scores.
 
-1. BRAND SPECIFICITY (weight 0.30)
-   Could this caption be copy-pasted onto a competitor's post with almost no changes?
+1. BRAND SPECIFICITY${assetMode ? ' — NOT APPLICABLE (asset-based post: score this 1 automatically)' : ' (weight 0.30)'}
+${assetMode ? '   N/A — the user provided their own asset, so brand specificity is inherently satisfied.' : `   Could this caption be copy-pasted onto a competitor's post with almost no changes?
    1 = no — it contains something distinctly tied to THIS brand (specific service name, unique angle, brand voice detail, or product-specific quality)
-   0 = yes — it's so generic that any similar business could post it unchanged
+   0 = yes — it's so generic that any similar business could post it unchanged`}
 
-2. CONTENT DEPTH (weight 0.25)
-   Does the caption give the reader a concrete reason to care — a specific fact, benefit, emotion, or story?
+2. CONTENT DEPTH${assetMode ? ' — NOT APPLICABLE (asset-based post: score this 1 automatically)' : ' (weight 0.25)'}
+${assetMode ? '   N/A — depth is evaluated through the asset description, not the caption alone.' : `   Does the caption give the reader a concrete reason to care — a specific fact, benefit, emotion, or story?
    1 = yes — tells the reader something real and specific
-   0 = no — it's descriptive padding ("experience the difference", "your journey starts here", "we're here for you")
+   0 = no — it's descriptive padding ("experience the difference", "your journey starts here", "we're here for you")`}
 
-3. VISUAL MATCH (weight 0.20)
+3. VISUAL MATCH (weight ${assetMode ? '0.45' : '0.20'})
    Does the caption actually describe or connect to what's in the visual concept?
    1 = yes — the caption is clearly written for THIS specific image
    0 = no — the caption would work equally well on a completely different image
 
-4. LANGUAGE (weight 0.15)
+4. LANGUAGE (weight ${assetMode ? '0.35' : '0.15'})
    Is it written entirely in ${sanitizeForPrompt(brandBrain.language, 100)}?
    1 = yes
    0 = no — wrong language or mixed
 
-5. RULES (weight 0.10)
+5. RULES (weight ${assetMode ? '0.20' : '0.10'})
    Does it avoid everything under NEVER mention?
 ${assetContext ? `   EXCEPTION: An asset was provided for this post (see ASSET CONTEXT in the user message). Content that directly describes or promotes the provided asset is ALWAYS allowed, even if the asset's category appears under "NEVER mention". Only score 0 if the caption invents or implies things NOT derived from the provided asset.` : ``}   1 = clean
    0 = violates a rule
-
-Be strict on criteria 1 and 2 — these are where weak posts hide. A post that just names the brand and says something nice scores 0 on both.
-
+${assetMode ? '' : '\nBe strict on criteria 1 and 2 — these are where weak posts hide. A post that just names the brand and says something nice scores 0 on both.'}
 Respond ONLY with valid JSON, no text outside it.`
 
   const userPrompt = `Review this post:
@@ -89,8 +91,8 @@ CAPTION: ${post.caption}
 Respond with this exact JSON (replace the placeholder values):
 {
   "reasoning": "one sentence per criterion explaining your score",
-  "specificity": 0,
-  "depth": 0,
+  "specificity": ${assetMode ? 1 : 0},
+  "depth": ${assetMode ? 1 : 0},
   "visual_match": 0,
   "language": 0,
   "rules": 0,
@@ -117,12 +119,17 @@ Respond with this exact JSON (replace the placeholder values):
   try {
     const p = JSON.parse(jsonStr)
     const toBin = (v: unknown) => (v === 1 || v === true ? 1 : 0)
-    const score =
-      toBin(p.specificity)  * 0.30 +
-      toBin(p.depth)        * 0.25 +
-      toBin(p.visual_match) * 0.20 +
-      toBin(p.language)     * 0.15 +
-      toBin(p.rules)        * 0.10
+    const score = assetMode
+      // Asset post: only visual_match + language + rules, renormalized weights
+      ? toBin(p.visual_match) * 0.45 +
+        toBin(p.language)     * 0.35 +
+        toBin(p.rules)        * 0.20
+      // Original post: full 5-criterion scoring
+      : toBin(p.specificity)  * 0.30 +
+        toBin(p.depth)        * 0.25 +
+        toBin(p.visual_match) * 0.20 +
+        toBin(p.language)     * 0.15 +
+        toBin(p.rules)        * 0.10
     return {
       score: Math.round(score * 100) / 100,
       feedback: p.feedback || 'No feedback provided.',
@@ -194,11 +201,14 @@ The caption MUST be directly inspired by and relevant to this scene. Do not writ
 ${assetNote ? `\nPRODUCT/ASSET DETAILS — MANDATORY: The following specific qualities MUST appear explicitly in the caption. Name them directly — do not paraphrase vaguely or bury them in generic language. The reader must clearly understand these exact characteristics:\n${sanitizeForPrompt(assetNote)}\n` : ''}${promoRequirement}
 Requirements:
 - Engaging, authentic, on-brand
-- 2-4 short paragraphs
-- Directly connected to the described scene
-- End with a subtle call-to-action
 - Language: ${s(brandBrain.language, 100)}
 - Tone: ${brandBrain.tone_keywords?.map(k => s(k, 100)).join(', ')}
+- Directly connected to the described scene
+- Soft structure (adapt as needed, do not label paragraphs):
+  • Para 1 — hook: a specific visual detail or surprising observation from the scene
+  • Para 2 — benefit or story: what this means for the customer or brand
+  • Para 3 (optional) — brand angle or deeper insight
+  • Final line — subtle call-to-action (1 sentence, not a command)
 
 Then on a new line write: HASHTAGS: followed by 20-25 relevant hashtags.
 
@@ -242,6 +252,7 @@ export interface AgentOutput {
   image_prompt: string
   template_layers: TemplateLayers
   visual_concept: string
+  selectedShotStyle?: string
 }
 
 export interface AssetGuidance {
@@ -252,6 +263,7 @@ export interface AssetGuidance {
   type: string
   mode: 'specific' | 'auto' | 'composite'
   locationDescription?: string      // pre-analyzed for place_photo / composite scenic
+  assetTypeSummary?: string         // auto mode: "2× product photo, 1× logo" etc.
   // composite-only:
   productUrl?: string
   productName?: string
@@ -399,15 +411,59 @@ type IndustryCategory =
   | 'general'
 
 const INDUSTRY_KEYWORDS: Array<[IndustryCategory, string[]]> = [
-  ['food_beverage',         ['coffee', 'café', 'cafe', 'bakery', 'restaurant', 'food', 'drink', 'beverage', 'bar', 'tea', 'wine', 'beer', 'gastro', 'culinary', 'pastry', 'catering', 'bistro', 'confection', 'chocolat']],
-  ['nature_agriculture',    ['bee', 'honey', 'včel', 'med', 'farm', 'garden', 'herb', 'flower', 'plant', 'organic', 'eco', 'nature', 'apiary', 'botanical', 'harvest', 'agriculture', 'forager', 'beekeep', 'vcelnic', 'včelár']],
-  ['tech_software',         ['tech', 'software', 'saas', 'app', 'digital', 'platform', 'startup', 'developer', 'data', 'cloud', 'code', 'web', 'fintech', 'martech', 'devops', 'cybersec', 'blockchain', 'ai ', 'it ']],
-  ['product_retail',        ['shop', 'store', 'retail', 'ecommerce', 'goods', 'packaging', 'merch', 'accessories', 'jewel', 'watch', 'luxury goods', 'candle', 'souvenir', 'stationery', 'gift']],
-  ['beauty_wellness',       ['beauty', 'skincare', 'cosmetic', 'spa', 'wellness', 'salon', 'nail', 'makeup', 'fragrance', 'perfume', 'body', 'hair', 'serum', 'moistur', 'esthetic', 'estetik']],
-  ['fashion_lifestyle',     ['fashion', 'clothing', 'apparel', 'wear', 'style', 'boutique', 'knitwear', 'textile', 'leather', 'fabric', 'atelier', 'couture', 'menswear', 'womenswear', 'odev', 'oblečen']],
-  ['fitness_sport',         ['fitness', 'gym', 'sport', 'training', 'yoga', 'pilates', 'crossfit', 'cycle', 'run', 'hike', 'athletic', 'martial', 'climb', 'trening', 'šport']],
-  ['hospitality',           ['hotel', 'hostel', 'resort', 'event', 'venue', 'wedding', 'travel', 'tourism', 'airbnb', 'accommodation', 'retreat', 'svadba', 'ubytovan']],
-  ['professional_services', ['consult', 'finance', 'law', 'legal', 'insurance', 'agency', 'hr', 'accountant', 'architect', 'medical', 'clinic', 'therapy', 'coaching', 'audit', 'advisory', 'klinika', 'advokát']],
+  ['food_beverage',         ['coffee', 'café', 'cafe', 'bakery', 'restaurant', 'food', 'drink', 'beverage', 'bar', 'tea', 'wine', 'beer', 'gastro', 'culinary', 'pastry', 'catering', 'bistro', 'confection', 'chocolat',
+                             /* SK */ 'kaviareň', 'kaviar', 'pekáreň', 'reštauráci', 'jedlo', 'nápoj', 'čaj', 'víno', 'pivo', 'cukráreň', 'čokolád',
+                             /* CS */ 'kavárna', 'pekárna', 'restaurac', 'jídlo', 'nápoj', 'čaj', 'víno', 'pivo', 'cukrárna',
+                             /* DE */ 'kaffee', 'bäckerei', 'restaurant', 'essen', 'getränk', 'tee', 'wein', 'bier', 'konditorei', 'gastronomie',
+                             /* HU */ 'kávéház', 'pékség', 'étterem', 'étel', 'ital', 'tea', 'bor', 'sör', 'cukrász',
+                             /* FR */ 'boulangerie', 'pâtisserie', 'café', 'restaurant', 'gastronomie', 'vin', 'bière', 'boisson']],
+  ['nature_agriculture',    ['bee', 'honey', 'včel', 'med', 'farm', 'garden', 'herb', 'flower', 'plant', 'organic', 'eco', 'nature', 'apiary', 'botanical', 'harvest', 'agriculture', 'forager', 'beekeep', 'vcelnic', 'včelár',
+                             /* SK */ 'záhrad', 'bylina', 'kvet', 'rastlin', 'prírodn', 'ekolog', 'úľ', 'medon',
+                             /* CS */ 'zahrad', 'bylina', 'květ', 'rostlin', 'přírod', 'ekolog', 'úl',
+                             /* DE */ 'garten', 'kräuter', 'blume', 'pflanze', 'natur', 'bio', 'biene', 'honig', 'ernte', 'landwirt',
+                             /* HU */ 'kert', 'gyógynövény', 'virág', 'növény', 'természet', 'bio', 'méh', 'méz', 'aratás',
+                             /* FR */ 'jardin', 'herbe', 'fleur', 'plante', 'nature', 'bio', 'abeille', 'miel', 'récolte', 'agriculture']],
+  ['tech_software',         ['tech', 'software', 'saas', 'app', 'digital', 'platform', 'startup', 'developer', 'data', 'cloud', 'code', 'web', 'fintech', 'martech', 'devops', 'cybersec', 'blockchain', 'ai ', 'it ',
+                             /* SK/CS */ 'technológi', 'vývoj', 'programov', 'digitáln',
+                             /* DE */ 'technologie', 'software', 'entwicklung', 'digital', 'anwendung',
+                             /* HU */ 'technológia', 'szoftver', 'fejlesztés', 'digitális', 'alkalmazás',
+                             /* FR */ 'technologie', 'logiciel', 'numérique', 'développement', 'application']],
+  ['product_retail',        ['shop', 'store', 'retail', 'ecommerce', 'goods', 'packaging', 'merch', 'accessories', 'jewel', 'watch', 'luxury goods', 'candle', 'souvenir', 'stationery', 'gift',
+                             /* SK */ 'obchod', 'predajňa', 'tovar', 'šperky', 'hodink', 'sviečk', 'darček',
+                             /* CS */ 'obchod', 'prodejna', 'zboží', 'šperky', 'hodinky', 'svíčka', 'dárek',
+                             /* DE */ 'laden', 'geschäft', 'einzelhandel', 'schmuck', 'uhr', 'kerze', 'geschenk', 'waren',
+                             /* HU */ 'bolt', 'üzlet', 'kiskereskedelem', 'ékszer', 'óra', 'gyertya', 'ajándék',
+                             /* FR */ 'boutique', 'magasin', 'commerce', 'bijou', 'montre', 'bougie', 'cadeau']],
+  ['beauty_wellness',       ['beauty', 'skincare', 'cosmetic', 'spa', 'wellness', 'salon', 'nail', 'makeup', 'fragrance', 'perfume', 'body', 'hair', 'serum', 'moistur', 'esthetic', 'estetik',
+                             /* SK */ 'krása', 'kozmetik', 'nechy', 'vlasy', 'parfum', 'starostlivos',
+                             /* CS */ 'krása', 'kosmetik', 'nehty', 'vlasy', 'parfém', 'péče',
+                             /* DE */ 'schönheit', 'kosmetik', 'hautpflege', 'wellness', 'nagel', 'haar', 'parfum', 'pflege',
+                             /* HU */ 'szépség', 'kozmetika', 'bőrápolás', 'wellness', 'köröm', 'haj', 'parfüm',
+                             /* FR */ 'beauté', 'cosmétique', 'soin', 'bien-être', 'ongle', 'cheveux', 'parfum']],
+  ['fashion_lifestyle',     ['fashion', 'clothing', 'apparel', 'wear', 'style', 'boutique', 'knitwear', 'textile', 'leather', 'fabric', 'atelier', 'couture', 'menswear', 'womenswear', 'odev', 'oblečen',
+                             /* SK */ 'móda', 'odevy', 'odev', 'štýl', 'látka', 'módny',
+                             /* CS */ 'móda', 'oblečení', 'styl', 'látka', 'módní',
+                             /* DE */ 'mode', 'kleidung', 'bekleidung', 'stil', 'stoff', 'textil', 'leder',
+                             /* HU */ 'divat', 'ruházat', 'stílus', 'szövet', 'bőr',
+                             /* FR */ 'mode', 'vêtement', 'style', 'tissu', 'cuir', 'prêt-à-porter']],
+  ['fitness_sport',         ['fitness', 'gym', 'sport', 'training', 'yoga', 'pilates', 'crossfit', 'cycle', 'run', 'hike', 'athletic', 'martial', 'climb', 'trening', 'šport',
+                             /* SK */ 'cvičen', 'pohyb', 'tréning', 'beh', 'turistik',
+                             /* CS */ 'cvičení', 'pohyb', 'trénink', 'běh', 'turistika',
+                             /* DE */ 'fitness', 'sport', 'training', 'laufen', 'wandern', 'klettern',
+                             /* HU */ 'fitnesz', 'sport', 'edzés', 'futás', 'túrázás',
+                             /* FR */ 'fitness', 'sport', 'entraînement', 'course', 'randonnée']],
+  ['hospitality',           ['hotel', 'hostel', 'resort', 'event', 'venue', 'wedding', 'travel', 'tourism', 'airbnb', 'accommodation', 'retreat', 'svadba', 'ubytovan',
+                             /* SK */ 'ubytovanie', 'cestovanie', 'turistika', 'svadba', 'podujatie', 'výlet',
+                             /* CS */ 'ubytování', 'cestování', 'turistika', 'svatba', 'událost', 'výlet',
+                             /* DE */ 'hotel', 'unterkunft', 'reisen', 'tourismus', 'hochzeit', 'veranstaltung', 'urlaub',
+                             /* HU */ 'szálloda', 'szállás', 'utazás', 'turizmus', 'esküvő', 'rendezvény',
+                             /* FR */ 'hôtel', 'hébergement', 'voyage', 'tourisme', 'mariage', 'événement']],
+  ['professional_services', ['consult', 'finance', 'law', 'legal', 'insurance', 'agency', 'hr', 'accountant', 'architect', 'medical', 'clinic', 'therapy', 'coaching', 'audit', 'advisory', 'klinika', 'advokát',
+                             /* SK */ 'poradenstvo', 'financie', 'právo', 'poisťovň', 'účtovníctvo', 'architekt', 'lekár', 'terapia',
+                             /* CS */ 'poradenství', 'finance', 'právo', 'pojišťovna', 'účetnictví', 'architekt', 'lékař', 'terapie',
+                             /* DE */ 'beratung', 'finanzen', 'recht', 'versicherung', 'buchführung', 'architekt', 'arzt', 'therapie',
+                             /* HU */ 'tanácsadás', 'pénzügy', 'jog', 'biztosítás', 'könyvelés', 'építész', 'orvos', 'terápia',
+                             /* FR */ 'conseil', 'finance', 'droit', 'assurance', 'comptabilité', 'architecte', 'médecin', 'thérapie']],
 ]
 
 function classifyIndustry(industry: string): IndustryCategory {
@@ -561,21 +617,36 @@ function buildIndustryPhotographyGuide(category: IndustryCategory): string {
   return INDUSTRY_PHOTOGRAPHY_GUIDES[category]
 }
 
-function buildShotStyleDirective(category: IndustryCategory = 'general'): string {
+function buildShotStyleDirective(
+  category: IndustryCategory = 'general',
+  recentShotStyles: string[] = []
+): { directive: string; selectedLabel: string } {
   const preferred = INDUSTRY_SHOT_STYLE_WEIGHTS[category]
+  const recentSet = new Set(recentShotStyles)
+
+  const freshPreferred = preferred.filter(i => !recentSet.has(SHOT_STYLES[i].label))
+  const freshAll = SHOT_STYLES.map((_, i) => i).filter(i => !recentSet.has(SHOT_STYLES[i].label))
+
   let idx: number
-  if (preferred.length < 7 && Math.random() < 0.70) {
-    idx = preferred[Math.floor(Math.random() * preferred.length)]
+  if (freshPreferred.length > 0 && Math.random() < 0.70) {
+    idx = freshPreferred[Math.floor(Math.random() * freshPreferred.length)]
+  } else if (freshAll.length > 0) {
+    idx = freshAll[Math.floor(Math.random() * freshAll.length)]
   } else {
-    idx = Math.floor(Math.random() * SHOT_STYLES.length)
+    // All styles recently used — fall back to preferred without exclusion
+    idx = preferred[Math.floor(Math.random() * preferred.length)]
   }
+
   const s = SHOT_STYLES[idx]
-  return `SHOT STYLE FOR THIS IMAGE — apply this exactly:
+  return {
+    directive: `SHOT STYLE FOR THIS IMAGE — apply this exactly:
 Camera angle: ${s.angle}
 Lens & aperture: ${s.lens}
 Lighting: ${s.lighting}
 Composition: ${s.composition}
-Style: ${s.label}`
+Style: ${s.label}`,
+    selectedLabel: s.label,
+  }
 }
 
 function buildPromoDirective(brandBrain: BrandBrain): string {
@@ -670,9 +741,11 @@ export async function generateOriginalImagePrompt(
   recentImagePrompts: string[] = [],
   brandContext?: BrandContext,
   feedback?: string,
-  postMode: 'topics' | 'services' = 'topics'
+  postMode: 'topics' | 'services' = 'topics',
+  recentShotStyles: string[] = []
 ): Promise<AgentOutput> {
   const category = classifyIndustry(brandBrain.industry ?? '')
+  const shotStyle = buildShotStyleDirective(category, recentShotStyles)
   const avoidSection = recentImagePrompts.length > 0
     ? `\nRECENTLY USED IMAGE CONCEPTS — you MUST choose a completely different concept, subject, setting, and visual style from all of these:\n${recentImagePrompts.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n`
     : ''
@@ -750,7 +823,7 @@ ${buildPeopleRule(brandBrain)}
 
 ⑧ ART STYLE — Photorealistic photography style fitting the industry guide above.
 
-⑨ ${buildShotStyleDirective(category)}
+⑨ ${shotStyle.directive}
 End with: "ultra-high resolution, no text, no words, no labels, no logos, no underglow, no neon ground lighting, no light strips beneath objects, no props unrelated to the scene subject."
 
 Write as one cohesive paragraph of clear prose. Aim for 150–250 words. Less is more.
@@ -763,15 +836,16 @@ Write as one cohesive paragraph of clear prose. Aim for 150–250 words. Less is
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. TEMPLATE_LAYERS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   - title: main headline (max 6 words, punchy, in ${sanitizeForPrompt(brandBrain.language, 100)})
-   - subtitle: supporting line (max 10 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
+   - title: ${postMode === 'services' ? `product-focused benefit statement (max 6 words, in ${sanitizeForPrompt(brandBrain.language, 100)})` : `educational hook or inspiring question about the topic (max 6 words, in ${sanitizeForPrompt(brandBrain.language, 100)})`}
+   - subtitle: ${postMode === 'services' ? `specific feature or result for this product (max 10 words, in ${sanitizeForPrompt(brandBrain.language, 100)})` : `supporting insight that deepens the topic (max 10 words, in ${sanitizeForPrompt(brandBrain.language, 100)})`}
    - cta: call-to-action (max 4 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
    - brand_name: "${sanitizeForPrompt(brandBrain.brand_name, 200)}"
 
 Respond ONLY with valid JSON:
 ${JSON_SCHEMA(sanitizeForPrompt(brandBrain.brand_name, 200))}${feedback ? `\n\nPREVIOUS ATTEMPT REJECTED — validator feedback: ${sanitizeForPrompt(feedback)}\nCorrect these issues in your new version.` : ''}`
 
-  return callClaude(prompt)
+  const result = await callClaude(prompt)
+  return { ...result, selectedShotStyle: shotStyle.selectedLabel }
 }
 
 // ─── 2. Asset — single brand asset as reference ────────────────────────────
@@ -782,9 +856,11 @@ export async function generateAssetImagePrompt(
   recentImagePrompts: string[] = [],
   brandContext?: BrandContext,
   feedback?: string,
-  postMode: 'topics' | 'services' = 'topics'
+  postMode: 'topics' | 'services' = 'topics',
+  recentShotStyles: string[] = []
 ): Promise<AgentOutput> {
   const category = classifyIndustry(brandBrain.industry ?? '')
+  const shotStyle = buildShotStyleDirective(category, recentShotStyles)
   const avoidSection = recentImagePrompts.length > 0
     ? `\nRECENTLY USED IMAGE CONCEPTS — you MUST choose a completely different concept, subject, setting, and visual style from all of these:\n${recentImagePrompts.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n`
     : ''
@@ -803,7 +879,7 @@ Image prompt excerpt: ${ex.image_prompt.slice(0, 420)}…`).join('\n')}
     : ''
 
   const assetSection = assetGuidance.mode === 'auto'
-    ? `\nBRAND ASSET GUIDANCE:\nThe brand has multiple uploaded assets that will be passed as reference images to the image generator. Craft a scene that naturally incorporates brand visual identity — products, packaging, or branded items — as the hero. The image generator will reference the brand's uploaded photos to maintain visual consistency.\n`
+    ? `\nBRAND ASSET GUIDANCE:\nThe brand's uploaded reference images will be passed to the image generator.${assetGuidance.assetTypeSummary ? ` Available assets: ${assetGuidance.assetTypeSummary}.` : ''} Use product photos as the primary visual reference for the hero subject. If product photos are present, the scene must feature the actual product — do NOT substitute it with an abstract concept or lifestyle scene. If only logos or icons are present, craft an aspirational lifestyle scene that reflects the brand identity without placing the logo as a physical object in the scene. The image generator will reference the uploaded photos to maintain visual consistency.\n`
     : `\nBRAND ASSET TO INCORPORATE:\n${
         assetGuidance.type === 'place_photo'
           ? `The user's brand is set in a specific physical location. Here is a detailed visual description of that space:
@@ -822,7 +898,7 @@ After that opening, structure the IMAGE_PROMPT as:
 ④ End with: "ultra-high resolution, editorial photography, no digital screens, no monitors, no digital displays, no underglow, no neon ground lighting, no light strips beneath objects"\n`
           : assetGuidance.type === 'product_photo'
           ? `The user has selected a PRODUCT PHOTO as the reference image. This is an actual photograph of the brand's physical product and will be passed to NanoBanana alongside your prompt.
-${assetGuidance.description ? `PRODUCT DETAILS — MANDATORY: These specific facts about this product MUST be reflected in your image_prompt and visual_concept — do NOT generate a generic product shot that ignores these details:\n${sanitizeForPrompt(assetGuidance.description)}\n` : ''}
+${assetGuidance.description ? `PRODUCT DETAILS — MANDATORY: These specific facts about this product MUST be reflected in your image_prompt and visual_concept — do NOT generate a generic product shot that ignores these details:\n${sanitizeForPrompt(assetGuidance.description)}\n` : ''}${assetGuidance.productPhysicalDescription ? `PHYSICAL DESCRIPTION OF THE PRODUCT (from Claude Vision analysis of the reference image) — use this to anchor Gemini's rendering. Every detail listed here MUST appear in your image_prompt exactly as described:\n${sanitizeForPrompt(assetGuidance.productPhysicalDescription)}\n` : ''}
 Your entire IMAGE_PROMPT must be a world-class PRODUCT PHOTOGRAPHY brief. The product from the reference photo is the absolute hero.
 
 Your IMAGE_PROMPT MUST begin with: "Using the attached reference image as the product — reproduce the product with absolute precision: its exact colors, materials, textures, finish, shape, construction, stitching, hardware, branding marks, and every visual detail exactly as shown in the reference, without any simplification, redesign, recoloring, or omission — placed in the scene described below —"
@@ -871,15 +947,24 @@ After that opening, describe:
 End the IMAGE_PROMPT with: "ultra-high resolution, professional tech product photography, no text overlays, no additional devices, no props, no underglow, no neon ground lighting, no light strips beneath objects"\n`
           : `The user has selected a specific brand asset. This exact asset image will be passed as a reference image to NanoBanana alongside your prompt.
 ${assetGuidance.description ? `ASSET DETAILS — MANDATORY: Apply these specific facts when building the scene:\n${sanitizeForPrompt(assetGuidance.description)}\n` : ''}
-CRITICAL PLACEMENT RULE: This asset is a label, logo, sticker, or packaging graphic. You MUST place it applied onto the appropriate physical product — infer the product from the brand's industry (e.g. a honey label goes on a honey jar, a coffee label on a bag or cup, a skincare label on a bottle or tin). Do NOT float it as a standalone object, lean it against a surface, or treat it as a decorative prop.
+CONTAINER INFERENCE — MANDATORY:
+You have no product photo reference — only the label/logo graphic. You MUST infer the exact physical container from the brand's Products/Services list below. Do NOT fall back to a generic industry default.
 
-Your IMAGE_PROMPT MUST begin with: "Using the attached reference image exactly as provided without any alterations, modifications, or reinterpretation — every detail, color, typography, shape, and graphic element of the reference must appear pixel-faithfully as a label/print on the product described below, with zero redesign or simplification —"
+Brand Products/Services: ${sanitizeForPrompt(brandBrain.products)}
+
+Before writing anything else, decide the container type from the products list above. Start your IMAGE_PROMPT with: "Inferring container type as [CONTAINER] based on brand products: [PRODUCT NAME]. Using the attached reference image exactly as provided without any alterations, modifications, or reinterpretation — every detail, color, typography, shape, and graphic element of the reference must appear pixel-faithfully as a label/print on the [CONTAINER] described below, with zero redesign or simplification —"
+
+If the container type cannot be determined from the products list, choose the most specific option that fits the brand's industry — never a generic bottle or jar.
+
+CRITICAL PLACEMENT RULE: Place the label/logo applied onto the inferred physical product. Do NOT float it as a standalone object, lean it against a surface, or treat it as a decorative prop.
 
 After that opening, describe ONLY:
-① The physical product the asset is applied to (e.g. "a 350ml amber glass honey jar with a metal lid") — shape, material, size, and finish
+① The physical product (inferred above) — exact shape, material, size, and finish
 ② How the asset is applied (wrapped label, front-face sticker, printed directly) and its position on the product
 ③ The surrounding scene, props, surface, background
 ④ The lighting setup
+
+Also include the inferred container type in your VISUAL_CONCEPT so it is clear what was generated.
 
 ABSOLUTE RULES:
 - Do NOT describe, name, or paraphrase any visual content of the asset itself — it appears exactly as the reference shows
@@ -937,7 +1022,7 @@ ${buildPeopleRule(brandBrain)}
 
 ⑨ ${assetGuidance.type === 'place_photo' || assetGuidance.type === 'photo'
   ? 'CAMERA ANGLE & PERSPECTIVE — Match the camera angle, height, and framing of the reference photo. The shot must feel like it was taken from within the same environment, not from above or as a flat lay.'
-  : buildShotStyleDirective(category)}
+  : shotStyle.directive}
 End with the mandatory closing line specified in the asset instructions above.
 
 One cohesive paragraph, 150–250 words.
@@ -959,7 +1044,9 @@ Write these specifically about the asset featured in this post — not generic b
 Respond ONLY with valid JSON:
 ${JSON_SCHEMA(sanitizeForPrompt(brandBrain.brand_name, 200))}${feedback ? `\n\nPREVIOUS ATTEMPT REJECTED — validator feedback: ${sanitizeForPrompt(feedback)}\nCorrect these issues in your new version.` : ''}`
 
-  return callClaude(prompt)
+  const result = await callClaude(prompt)
+  const isLocationBased = assetGuidance.type === 'place_photo' || assetGuidance.type === 'photo'
+  return { ...result, selectedShotStyle: isLocationBased ? undefined : shotStyle.selectedLabel }
 }
 
 // ─── 3. Composite — two assets: scenic + product ───────────────────────────
@@ -967,9 +1054,29 @@ ${JSON_SCHEMA(sanitizeForPrompt(brandBrain.brand_name, 200))}${feedback ? `\n\nP
 export async function generateCompositeImagePrompt(
   brandBrain: BrandBrain,
   assetGuidance: AssetGuidance,
+  recentImagePrompts: string[] = [],
+  brandContext?: BrandContext,
   feedback?: string
 ): Promise<AgentOutput> {
   const category = classifyIndustry(brandBrain.industry ?? '')
+
+  const avoidSection = recentImagePrompts.length > 0
+    ? `\nRECENTLY USED IMAGE CONCEPTS — you MUST choose a completely different concept, subject, setting, and visual style from all of these:\n${recentImagePrompts.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n`
+    : ''
+
+  const contextSection = brandContext?.examples.length
+    ? `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CALIBRATION EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The following examples show the quality, specificity, and prose style your IMAGE_PROMPT must match.
+Do NOT repeat any of these visual concepts — use them only to calibrate format and detail level.
+${brandContext.examples.map((ex, i) => `
+[Example ${i + 1}]
+Visual concept: ${ex.visual_concept}
+Image prompt excerpt: ${ex.image_prompt.slice(0, 420)}…`).join('\n')}
+`
+    : ''
+
   const prompt = `You are a world-class commercial photographer and creative director specializing in luxury product advertising. You are creating an image generation brief for the brand "${sanitizeForPrompt(brandBrain.brand_name, 200)}".
 
 BRAND: ${sanitizeForPrompt(brandBrain.brand_name, 200)}
@@ -977,7 +1084,7 @@ Products: ${sanitizeForPrompt(brandBrain.products)}
 Tone: ${brandBrain.tone_keywords?.map(k => sanitizeForPrompt(k, 100)).join(', ')}
 Language: ${sanitizeForPrompt(brandBrain.language, 100)}
 ${brandBrain.post_avoid ? `Never reference: ${sanitizeForPrompt(brandBrain.post_avoid)}\n` : ''}${buildPromoDirective(brandBrain)}
-${buildIndustryPhotographyGuide(category)}
+${contextSection}${avoidSection}${buildIndustryPhotographyGuide(category)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COMPOSITE BRIEF
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -985,8 +1092,8 @@ TWO REFERENCE IMAGES ARE ATTACHED:
 — Reference image 1: THE PRODUCT — the exact item to be placed into the scene (the hero)
 — Reference image 2: THE SCENE — the exact physical location and environment (the backdrop)
 
-PRODUCT: the brand's product shown in reference image 2
-${assetGuidance.productDescription ? `PRODUCT DETAILS — MANDATORY: These specific facts about this product MUST be reflected in your image_prompt and visual_concept:\n${sanitizeForPrompt(assetGuidance.productDescription)}\n` : ''}SCENE ANALYSIS (from reference image 2): "${sanitizeForPrompt(assetGuidance.locationDescription) || 'a real physical location — reproduce it exactly as shown'}"
+PRODUCT: the brand's product shown in reference image 1
+${assetGuidance.productDescription ? `PRODUCT DETAILS — MANDATORY: These specific facts about this product MUST be reflected in your image_prompt and visual_concept:\n${sanitizeForPrompt(assetGuidance.productDescription)}\n` : ''}${assetGuidance.productPhysicalDescriptionComposite ? `PHYSICAL DESCRIPTION OF THE PRODUCT (from Claude Vision analysis of reference image 1) — anchor your rendering to these exact physical properties:\n${sanitizeForPrompt(assetGuidance.productPhysicalDescriptionComposite)}\n` : ''}SCENE ANALYSIS (from reference image 2): "${sanitizeForPrompt(assetGuidance.locationDescription) || 'a real physical location — reproduce it exactly as shown'}"
 ${assetGuidance.description ? `SCENE DETAILS — MANDATORY: These specific facts about this location MUST be reflected in the atmosphere of your image:\n${sanitizeForPrompt(assetGuidance.description)}\n` : ''}
 Your IMAGE_PROMPT must produce a world-class cinematic advertisement — the product from reference image 1 as the dramatic, brilliantly lit hero filling the frame, with the environment from reference image 2 as the atmospheric backdrop. The product is the sole subject: it must dominate the frame exactly as it appears in the reference — whether that is a car, a bottle, a piece of equipment, or any other object. Do NOT substitute it with a smaller or associated object (e.g. do NOT replace a car with a car key, do NOT replace a coffee machine with a coffee cup).
 
