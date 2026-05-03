@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic'
 import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 import type { Post } from '@/types'
-import { VALIDATION_THRESHOLD, VALIDATION_THRESHOLD_ASSET } from '@/lib/constants'
 import toast from 'react-hot-toast'
 
 const CanvasEditor = dynamic(
@@ -285,95 +284,6 @@ export function PostDetailClient({ post: initialPost }: { post: Post }) {
             )}
           </div>
 
-          {/* Validation debug */}
-          {(() => {
-            const meta = (post as any).generation_metadata
-            if (!meta || meta.validation_score == null) return null
-            const score: number = meta.validation_score
-            const attempts: number = meta.validation_attempts ?? 1
-            const feedback: string = meta.validation_feedback ?? ''
-            const assetMode: string = meta.asset_mode ?? 'original'
-            const postMode: string = meta.post_mode ?? ''
-            const shotStyle: string = meta.shot_style ?? ''
-            const failed: boolean = !!meta.validation_failed
-            const isAsset = assetMode !== 'original'
-            const threshold = isAsset ? VALIDATION_THRESHOLD_ASSET : VALIDATION_THRESHOLD
-            const passed = score >= threshold
-
-            const scoreColor = score >= 0.65 ? '#6EBF8B' : score >= 0.4 ? '#c9a840' : '#e05c5c'
-            const barPct = Math.round(score * 100)
-            const threshPct = Math.round(threshold * 100)
-
-            const criteria = isAsset
-              ? [
-                  { key: 'visual_match', label: 'Visual Match',  weight: '45%' },
-                  { key: 'language',     label: 'Language',       weight: '35%' },
-                  { key: 'rules',        label: 'Rules',          weight: '20%' },
-                ]
-              : [
-                  { key: 'specificity',  label: 'Brand Specificity', weight: '30%' },
-                  { key: 'depth',        label: 'Content Depth',     weight: '25%' },
-                  { key: 'visual_match', label: 'Visual Match',      weight: '20%' },
-                  { key: 'language',     label: 'Language',          weight: '15%' },
-                  { key: 'rules',        label: 'Rules',             weight: '10%' },
-                ]
-
-            return (
-              <div style={{ borderTop:'1px solid #2D2A1F', marginTop:4, paddingTop:16 }}>
-                {/* Header row */}
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                  <span style={{ fontSize:10, letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', fontFamily:'var(--font-ibm)', fontWeight:400 }}>Brand Validation</span>
-                  <span style={{
-                    fontSize:9, letterSpacing:'.1em', textTransform:'uppercase', fontFamily:'var(--font-ibm)', fontWeight:600,
-                    color: passed ? '#6EBF8B' : '#e05c5c',
-                    padding:'2px 7px', borderRadius:4,
-                    background: passed ? 'rgba(110,191,139,0.1)' : 'rgba(224,92,92,0.1)',
-                    border: `1px solid ${passed ? 'rgba(110,191,139,0.3)' : 'rgba(224,92,92,0.3)'}`,
-                  }}>
-                    {failed ? 'Hard Failed' : passed ? 'Passed' : 'Failed'}
-                  </span>
-                </div>
-
-                {/* Score bar */}
-                <div style={{ position:'relative', height:4, background:'rgba(255,255,255,0.06)', borderRadius:2, marginBottom:8 }}>
-                  <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${barPct}%`, background:scoreColor, borderRadius:2, transition:'width .4s' }} />
-                  {/* threshold marker */}
-                  <div style={{ position:'absolute', top:-3, left:`${threshPct}%`, width:1, height:10, background:'rgba(255,255,255,0.25)', transform:'translateX(-50%)' }} />
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:14 }}>
-                  <span style={{ fontSize:11, fontFamily:'var(--font-ibm)', fontWeight:600, color:scoreColor }}>{score.toFixed(2)}</span>
-                  <span style={{ fontSize:10, fontFamily:'var(--font-ibm)', color:'rgba(255,255,255,0.25)' }}>threshold {threshold.toFixed(2)} · {attempts}/3 attempt{attempts !== 1 ? 's' : ''}</span>
-                </div>
-
-                {/* Criteria table */}
-                <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:14 }}>
-                  {criteria.map(c => (
-                    <div key={c.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <span style={{ fontSize:10, fontFamily:'var(--font-ibm)', color:'var(--muted)' }}>{c.label}</span>
-                      <span style={{ fontSize:10, fontFamily:'var(--font-ibm)', color:'rgba(255,255,255,0.2)' }}>{c.weight}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Context row */}
-                {(postMode || shotStyle || assetMode !== 'original') && (
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom:12 }}>
-                    {postMode && <span style={{ fontSize:9, padding:'2px 6px', borderRadius:3, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--muted)', fontFamily:'var(--font-ibm)', textTransform:'capitalize' }}>{postMode}</span>}
-                    {assetMode !== 'original' && <span style={{ fontSize:9, padding:'2px 6px', borderRadius:3, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--muted)', fontFamily:'var(--font-ibm)', textTransform:'capitalize' }}>{assetMode}</span>}
-                    {shotStyle && <span style={{ fontSize:9, padding:'2px 6px', borderRadius:3, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--muted)', fontFamily:'var(--font-ibm)' }}>{shotStyle}</span>}
-                  </div>
-                )}
-
-                {/* Feedback */}
-                {feedback && (
-                  <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:8, padding:'10px 12px' }}>
-                    <span style={{ fontSize:9, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--muted)', fontFamily:'var(--font-ibm)', display:'block', marginBottom:6 }}>Validator Feedback</span>
-                    <p style={{ margin:0, fontSize:11, lineHeight:1.65, color:'var(--sand)', fontFamily:'var(--font-ibm)', fontWeight:300 }}>{feedback}</p>
-                  </div>
-                )}
-              </div>
-            )
-          })()}
 
         </div>
       </div>
