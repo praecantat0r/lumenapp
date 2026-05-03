@@ -92,7 +92,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
       {showGenModal && (
         <GeneratePostModal
           brandAssets={brandAssets}
-          onGenerate={generatePost}
+          onGenerate={(config) => { setShowGenModal(false); generatePost(config) }}
           onClose={() => setShowGenModal(false)}
         />
       )}

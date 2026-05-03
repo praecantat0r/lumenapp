@@ -8,7 +8,7 @@ export const maxDuration = 300
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateCaption, generateOriginalImagePrompt, generateAssetImagePrompt, generateCompositeImagePrompt, validatePost, analyzeLocationPhoto, analyzeProductAsset, type AssetGuidance } from '@/lib/anthropic'
 import { buildBrandContext } from '@/lib/context-builder'
-import { generateImage, prefetchReferenceImages, type ImagePart } from '@/lib/nanobanana'
+import { generateImage } from '@/lib/nanobanana'
 import { renderPostServer, seedUserDefaultTemplate, SEED_CANVAS_JSON } from '@/lib/renderer'
 import type { BrandBrain } from '@/types'
 
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .not('image_prompt', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(5)
     const recentImagePrompts = (recentPosts || [])
       .map((p: { image_prompt: string | null }) => p.image_prompt)
       .filter(Boolean) as string[]
@@ -283,7 +283,7 @@ export async function POST(req: NextRequest) {
       .map((p: any) => p.generation_metadata?.shot_style)
       .filter(Boolean) as string[]
 
-    const MAX_ATTEMPTS = 3
+    const MAX_ATTEMPTS = 2
     let image_prompt!: string
     let template_layers: any
     let visual_concept!: string
