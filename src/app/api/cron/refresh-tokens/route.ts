@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 import { refreshInstagramToken } from '@/lib/instagram'
 import { rateLimit } from '@/lib/rate-limit'
 import { decryptToken, encryptToken } from '@/lib/token-crypto'

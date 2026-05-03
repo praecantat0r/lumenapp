@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateCaption, generateOriginalImagePrompt, validatePost } from '@/lib/anthropic'
 import { buildBrandContext } from '@/lib/context-builder'

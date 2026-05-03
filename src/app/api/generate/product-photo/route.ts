@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { waitUntil } from '@vercel/functions'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteClient as createClient } from '@/lib/supabase/server'
 import { analyzeLocationPhoto, analyzeProductAsset, generateProductPhotoPrompt, type AssetGuidance } from '@/lib/anthropic'
 import { generateImage, prefetchReferenceImages } from '@/lib/nanobanana'
 import { getLimits, monthStart } from '@/lib/plans'
