@@ -1,5 +1,5 @@
 // Validation pass threshold for original (fully AI-generated) posts
-export const VALIDATION_THRESHOLD = 0.65
+export const VALIDATION_THRESHOLD = 0.50
 
 // Validation pass threshold for asset-based posts (only 3 criteria checked)
 export const VALIDATION_THRESHOLD_ASSET = 0.5
