@@ -59,7 +59,7 @@ The main generation pipeline is at `src/app/api/generate/pipeline/route.ts`. Cro
 Use `src/lib/supabase/server.ts` in Server Components and API routes; use `src/lib/supabase/client.ts` in Client Components. Middleware for auth is in `src/lib/supabase/middleware.ts`.
 
 ### Environment Variables
-Required in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `TEMPLATED_API_KEY`, `TEMPLATED_BASE_TEMPLATE_ID`, `NEXT_PUBLIC_TEMPLATED_EMBED_CONFIG_ID`, `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`.
+Required in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `TEMPLATED_API_KEY`, `TEMPLATED_BASE_TEMPLATE_ID`, `NEXT_PUBLIC_TEMPLATED_EMBED_CONFIG_ID`, `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`.
 
 ## DO NOT TOUCH — Locked Implementations
 

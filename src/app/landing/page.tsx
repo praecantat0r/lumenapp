@@ -17,7 +17,7 @@ import { Footer } from './_components/Footer'
 const TWEAK_DEFAULTS = {
   heroVariant: 'B' as 'A' | 'B',
   headline: '',
-  ctaLabel: 'Start free trial',
+  ctaLabel: 'Start free',
   feedDensity: 'default',
   theme: 'light',
   sections: {
@@ -80,6 +80,32 @@ function App() {
     window.location.href = 'https://app.lumen-reach.com/signup'
   }
 
+  const goToPlan = async (plan: 'free' | 'starter' | 'growth' | 'agency') => {
+    if (plan === 'free') return goToSignup()
+    if (plan === 'agency') {
+      window.location.href = 'mailto:sales@lumen-reach.com'
+      return
+    }
+
+    const res = await fetch('/api/billing/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan }),
+    })
+
+    if (res.status === 401) {
+      window.location.href = `https://app.lumen-reach.com/signup?plan=${plan}`
+      return
+    }
+
+    const data = await res.json()
+    if (data.manageBilling) {
+      window.location.href = '/dashboard/billing'
+      return
+    }
+    if (data.url) window.location.href = data.url
+  }
+
   const Hero = state.heroVariant === 'B' ? HeroB : HeroA
 
   return (
@@ -106,7 +132,7 @@ function App() {
       {state.sections.feed        && <FeedPreview density={state.feedDensity} />}
       {state.sections.video       && <VideoPreview />}
       {state.sections.testimonials && <Testimonials />}
-      {state.sections.pricing     && <Pricing onCTA={goToSignup} />}
+      {state.sections.pricing     && <Pricing onCTA={goToPlan} />}
       {state.sections.faq         && <FAQ />}
 
       <Footer onCTA={goToSignup} />

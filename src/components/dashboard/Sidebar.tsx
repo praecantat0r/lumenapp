@@ -49,6 +49,7 @@ export function Sidebar({ userEmail, userName, brandName, plan, pendingCount, in
     { href: '/dashboard/templates',          label: t('nav.templates'),         icon: 'grid_view' },
     { href: '/dashboard/statistics',         label: t('nav.analytics'),         icon: 'monitoring' },
     { href: '/dashboard/brand-brain',        label: t('nav.brandBrain'),        icon: 'psychology' },
+    { href: '/dashboard/billing',            label: t('nav.billing'),           icon: 'credit_card' },
   ]
 
   const adminNavItems = [

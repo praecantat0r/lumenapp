@@ -3,7 +3,7 @@ import { Button, SectionHeader } from './ui'
 import { useT } from './LangContext'
 import { useBreakpoint } from './useBreakpoint'
 
-export function Pricing({ onCTA }: { onCTA: () => void }) {
+export function Pricing({ onCTA }: { onCTA: (plan: 'free' | 'starter' | 'growth' | 'agency') => void }) {
   const { t } = useT()
   const { isMobile, isTablet } = useBreakpoint()
   const variants = ['ghost', 'ghost', 'primary', 'ghost'] as const
@@ -43,7 +43,7 @@ export function Pricing({ onCTA }: { onCTA: () => void }) {
                   <div style={{ marginTop: 24, height: isMobile ? 44 : 52 }} />
 
                   <div style={{ marginTop: 28 }}>
-                    <Button variant="ghost" size="lg" style={{ width: '100%' }} onClick={onCTA}>{tier.cta}</Button>
+                    <Button variant="ghost" size="lg" style={{ width: '100%' }} onClick={() => onCTA('agency')}>{tier.cta}</Button>
                   </div>
 
                   <div style={{ marginTop: 28, borderTop: '1px solid var(--border)', paddingTop: 22, display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -90,7 +90,14 @@ export function Pricing({ onCTA }: { onCTA: () => void }) {
                 </div>
 
                 <div style={{ marginTop: 28 }}>
-                  <Button variant={variants[i]} size="lg" style={{ width: '100%' }} onClick={onCTA}>{tier.cta}</Button>
+                  <Button
+                    variant={variants[i]}
+                    size="lg"
+                    style={{ width: '100%' }}
+                    onClick={() => onCTA((['free', 'starter', 'growth'] as const)[i])}
+                  >
+                    {tier.cta}
+                  </Button>
                 </div>
 
                 <div style={{ marginTop: 28, borderTop: '1px solid var(--border)', paddingTop: 22, display: 'flex', flexDirection: 'column', gap: 11 }}>

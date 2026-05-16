@@ -21,6 +21,7 @@ const en: Dict = {
     templates: 'Templates',
     analytics: 'Analytics',
     brandBrain: 'Brand Brain',
+    billing: 'Billing',
     editor: 'Editor',
     instagram: 'Instagram',
     igLive: 'Live',

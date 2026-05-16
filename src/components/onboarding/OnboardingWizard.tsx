@@ -31,7 +31,7 @@ const initialForm: BrandBrainForm = {
   platforms: ['instagram'], posting_frequency: '3x/week', posting_time: '',
 }
 
-export function OnboardingWizard({ userId }: { userId: string }) {
+export function OnboardingWizard({ userId, checkoutPlan }: { userId: string; checkoutPlan?: 'starter' | 'growth' }) {
   const [step, setStep]       = useState(1)
   const [form, setForm]       = useState<BrandBrainForm>(initialForm)
   const [loading, setLoading] = useState(false)
@@ -136,7 +136,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
 
   function complete() {
     setDone(true)
-    setTimeout(() => router.push('/dashboard/overview'), 2800)
+    setTimeout(() => router.push(checkoutPlan ? `/dashboard/billing?checkout=${checkoutPlan}` : '/dashboard/overview'), 2800)
   }
 
   if (done) return <OnboardingSuccess />

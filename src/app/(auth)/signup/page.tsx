@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { LumenMark } from '@/components/ui/LumenLogo'
@@ -13,6 +13,8 @@ export default function SignupPage() {
   const [loading, setLoading]       = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const intendedPlan = searchParams.get('plan')
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -29,7 +31,9 @@ export default function SignupPage() {
       return
     }
     toast.success('Account created! Setting up your workspace…')
-    router.push('/onboarding')
+    router.push(intendedPlan === 'starter' || intendedPlan === 'growth'
+      ? `/onboarding?plan=${intendedPlan}`
+      : '/onboarding')
   }
 
   return (
