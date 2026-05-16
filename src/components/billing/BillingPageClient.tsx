@@ -6,6 +6,8 @@ type Plan = 'free' | 'starter' | 'growth' | 'agency' | 'pro'
 interface Profile {
   subscription_status: string | null
   current_period_end: string | null
+  cancel_at: string | null
+  canceled_at: string | null
   stripe_customer_id: string | null
 }
 
@@ -74,8 +76,13 @@ export function BillingPageClient({ plan, planLabel, postsUsed, photosUsed, limi
   const effectivePlan = plan === 'pro' ? 'starter' : plan
   const isPaid = plan !== 'free'
 
+  const subscriptionDate = profile?.cancel_at
+    ? `cancels ${new Date(profile.cancel_at).toLocaleDateString()}`
+    : profile?.current_period_end
+      ? `renews ${new Date(profile.current_period_end).toLocaleDateString()}`
+      : null
   const renewalText = profile?.subscription_status
-    ? `${profile.subscription_status}${profile.current_period_end ? ` · renews ${new Date(profile.current_period_end).toLocaleDateString()}` : ''}`
+    ? `${profile.subscription_status}${subscriptionDate ? ` · ${subscriptionDate}` : ''}`
     : null
 
   return (

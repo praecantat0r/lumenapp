@@ -1,7 +1,13 @@
 import Stripe from 'stripe'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { getStripe, getSubscriptionPeriodEnd, planFromSubscription } from '@/lib/stripe'
+import {
+  getStripe,
+  getSubscriptionCanceledAt,
+  getSubscriptionCancelAt,
+  getSubscriptionPeriodEnd,
+  planFromSubscription,
+} from '@/lib/stripe'
 
 async function syncSubscription(subscription: Stripe.Subscription, fallbackUserId?: string | null) {
   const supabase = createServiceClient()
@@ -10,6 +16,8 @@ async function syncSubscription(subscription: Stripe.Subscription, fallbackUserI
   const priceId = subscription.items.data[0]?.price.id ?? null
   const plan = planFromSubscription(subscription)
   const currentPeriodEnd = getSubscriptionPeriodEnd(subscription)
+  const cancelAt = getSubscriptionCancelAt(subscription)
+  const canceledAt = getSubscriptionCanceledAt(subscription)
 
   let userId = subscription.metadata.user_id || fallbackUserId || null
 
@@ -33,6 +41,8 @@ async function syncSubscription(subscription: Stripe.Subscription, fallbackUserI
       stripe_price_id: priceId,
       subscription_status: subscription.status,
       current_period_end: currentPeriodEnd,
+      cancel_at: cancelAt,
+      canceled_at: canceledAt,
     })
     .eq('id', userId)
 

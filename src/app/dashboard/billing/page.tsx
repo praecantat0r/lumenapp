@@ -8,7 +8,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   const supabase = await createClient()
   const [{ data: profile }, { count: postsUsed }, { count: photosUsed }] = await Promise.all([
-    supabase.from('profiles').select('plan, stripe_customer_id, subscription_status, current_period_end').eq('id', user.id).single(),
+    supabase.from('profiles').select('plan, stripe_customer_id, subscription_status, current_period_end, cancel_at, canceled_at').eq('id', user.id).single(),
     supabase.from('posts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', monthStart()),
     supabase.from('product_photos').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', monthStart()),
   ])

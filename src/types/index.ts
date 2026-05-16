@@ -9,6 +9,8 @@ export interface Profile {
   stripe_price_id?: string
   subscription_status?: string
   current_period_end?: string
+  cancel_at?: string
+  canceled_at?: string
   created_at: string
   updated_at: string
 }

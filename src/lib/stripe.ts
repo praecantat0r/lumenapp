@@ -38,6 +38,14 @@ export function getSubscriptionPeriodEnd(subscription: Stripe.Subscription) {
   return periodEnd ? new Date(periodEnd * 1000).toISOString() : null
 }
 
+export function getSubscriptionCancelAt(subscription: Stripe.Subscription) {
+  return subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null
+}
+
+export function getSubscriptionCanceledAt(subscription: Stripe.Subscription) {
+  return subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null
+}
+
 export function getAppUrl(requestUrl: string) {
   const requestOrigin = new URL(requestUrl).origin
   if (requestOrigin.includes('localhost') || requestOrigin.includes('127.0.0.1')) {
