@@ -51,20 +51,20 @@ export async function validatePost(
   const skip = new Set(skipCriteria ?? [])
   const assetMode = skip.size > 0
 
-  const system = `You are a senior Instagram content strategist reviewing a post for the brand below. Your job is to catch posts that are technically on-topic but still weak — generic, predictable, or forgettable. Be genuinely critical.
+  const system = `You are an Instagram content reviewer checking if a post meets the brand's basic standards. Your goal is to pass good-enough posts and flag only genuinely problematic ones.
 
 ${getBrandProfile(brandBrain)}
-Score each criterion with exactly 0 or 1. No partial scores.
+Score each criterion with exactly 0 or 1. No partial scores. When in doubt, score 1.
 
 1. BRAND SPECIFICITY${assetMode ? ' — NOT APPLICABLE (asset-based post: score this 1 automatically)' : ' (weight 0.30)'}
-${assetMode ? '   N/A — the user provided their own asset, so brand specificity is inherently satisfied.' : `   Could this caption be copy-pasted onto a competitor's post with almost no changes?
-   1 = no — it contains something distinctly tied to THIS brand (specific service name, unique angle, brand voice detail, or product-specific quality)
-   0 = yes — it's so generic that any similar business could post it unchanged`}
+${assetMode ? '   N/A — the user provided their own asset, so brand specificity is inherently satisfied.' : `   Is the caption relevant to this brand's industry, products, or audience?
+   1 = yes — it fits this brand's context (even if not hyper-specific)
+   0 = only if it's completely off-brand or could belong to a totally unrelated industry`}
 
 2. CONTENT DEPTH${assetMode ? ' — NOT APPLICABLE (asset-based post: score this 1 automatically)' : ' (weight 0.25)'}
-${assetMode ? '   N/A — depth is evaluated through the asset description, not the caption alone.' : `   Does the caption give the reader a concrete reason to care — a specific fact, benefit, emotion, or story?
-   1 = yes — tells the reader something real and specific
-   0 = no — it's descriptive padding ("experience the difference", "your journey starts here", "we're here for you")`}
+${assetMode ? '   N/A — depth is evaluated through the asset description, not the caption alone.' : `   Does the caption say something meaningful (not pure filler)?
+   1 = yes — there's at least one concrete idea, benefit, emotion, or call to action
+   0 = only if it's entirely empty filler with zero substance`}
 
 3. VISUAL MATCH (weight ${assetMode ? '0.45' : '0.20'})
    Does the caption actually describe or connect to what's in the visual concept?
@@ -80,7 +80,7 @@ ${assetMode ? '   N/A — depth is evaluated through the asset description, not 
    Does it avoid everything under NEVER mention?
 ${assetContext ? `   EXCEPTION: An asset was provided for this post (see ASSET CONTEXT in the user message). Content that directly describes or promotes the provided asset is ALWAYS allowed, even if the asset's category appears under "NEVER mention". Only score 0 if the caption invents or implies things NOT derived from the provided asset.` : ``}   1 = clean
    0 = violates a rule
-${assetMode ? '' : '\nBe strict on criteria 1 and 2 — these are where weak posts hide. A post that just names the brand and says something nice scores 0 on both.'}
+${assetMode ? '' : '\nDefault to passing — only score 0 if the criterion is clearly violated. A post that mentions the brand and says something relevant passes criteria 1 and 2.'}
 Respond ONLY with valid JSON, no text outside it.`
 
   const userPrompt = `Review this post:
@@ -1097,7 +1097,7 @@ ${assetGuidance.productDescription ? `PRODUCT DETAILS — MANDATORY: These speci
 ${assetGuidance.description ? `SCENE DETAILS — MANDATORY: These specific facts about this location MUST be reflected in the atmosphere of your image:\n${sanitizeForPrompt(assetGuidance.description)}\n` : ''}
 Your IMAGE_PROMPT must produce a world-class cinematic advertisement — the product from reference image 1 as the dramatic, brilliantly lit hero filling the frame, with the environment from reference image 2 as the atmospheric backdrop. The product is the sole subject: it must dominate the frame exactly as it appears in the reference — whether that is a car, a bottle, a piece of equipment, or any other object. Do NOT substitute it with a smaller or associated object (e.g. do NOT replace a car with a car key, do NOT replace a coffee machine with a coffee cup).
 
-The IMAGE_PROMPT MUST begin with exactly this sentence: "Reference image 1 is ${sanitizeForPrompt(assetGuidance.productName, 200) || 'the product'} — photograph the exact object shown in reference image 1 as the absolute hero, preserving every detail of its appearance, shape, color, and finish precisely as shown; do NOT substitute it with any other object, accessory, or associated item. Reference image 2 is a photograph — use ONLY what is literally visible within that photo's frame as the background behind the product; do NOT extend the scene beyond the photo's edges, do NOT invent or infer what lies outside the frame, do NOT reinterpret it as a 3D environment you can rotate around — treat it as a fixed flat canvas; the visible portion of the photo appears softly out of focus behind the product, providing depth and color context without becoming the main subject."
+The IMAGE_PROMPT MUST begin with exactly this sentence: "Reference image 1 is ${sanitizeForPrompt(assetGuidance.productName, 200) || 'the product'} — photograph the exact object shown in reference image 1 as the absolute hero, preserving every detail of its appearance, shape, color, and finish precisely as shown — shown in its complete form from base to top, not cropped or zoomed into a partial view; do NOT substitute it with any other object, accessory, or associated item. Reference image 2 is a photograph — use ONLY what is literally visible within that photo's frame as the background behind the product; do NOT extend the scene beyond the photo's edges, do NOT invent or infer what lies outside the frame, do NOT reinterpret it as a 3D environment you can rotate around — treat it as a fixed flat canvas; the visible portion of the photo appears softly out of focus behind the product, providing depth and color context without becoming the main subject."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. IMAGE_PROMPT
@@ -1110,7 +1110,7 @@ CREATIVE DIRECTION — read this first: Study both reference images and choose t
 
 INDUSTRY GUIDE PRIORITY: The INDUSTRY PHOTOGRAPHY GUIDE at the top of this brief defines the aesthetic for this brand's category — read it before making any lighting or mood decision. If it specifies a warm golden outdoor look, lean into the scene's natural sunlight quality rather than inventing artificial drama. The guide takes precedence over generic cinematic defaults.
 
-PRODUCT PLACEMENT: The exact product from reference image 1 — reproduced faithfully at its actual scale and form — positioned in the foreground using rule of thirds. Dominant, slightly off-center. Choose the angle that makes it look most compelling: 3/4 rotation, straight-on, or low-angle — whichever reveals its true shape and character best. The product occupies 45–65% of the frame height.
+PRODUCT PLACEMENT: The exact product from reference image 1 — reproduced faithfully in appearance, shape, color, and finish — positioned in the foreground using rule of thirds. Dominant, slightly off-center. Choose the angle that makes it look most compelling: 3/4 rotation, straight-on, or low-angle — whichever reveals its true shape and character best. The product occupies 45–65% of the frame height. CRITICAL FRAMING RULE: The COMPLETE product must be fully visible in the frame from its base/bottom to its top — do NOT zoom in on, crop, or show only a portion of the product. If the reference photo is a tight close-up that does not show the full item, you MUST zoom out in the generated image to reveal the entire product. For food (burgers, sandwiches, cakes, etc.) this means showing the complete stack from bottom bun/base to top bun/topping — never just the top surface.
 
 SURFACE & GROUNDING: Choose the most visually compelling solid surface present in reference image 2 — prioritize horizontal surfaces with texture and character: a wooden plank, stone slab, shelf ledge, or countertop. Avoid bare ground, dirt, or gravel. The product MUST physically rest on this surface with full contact — no gap between base and surface. The surface texture must visibly continue beneath the product's base. Render a soft contact shadow at the base perimeter that confirms physical weight.
 

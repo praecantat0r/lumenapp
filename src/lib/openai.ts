@@ -80,13 +80,12 @@ Rules to follow:
 6. Use short paragraphs separated by blank lines. Keep it readable.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-HASHTAG RULES:
-- Use 8–12 hashtags (optimal range for reach without looking spammy)
-- Mix: 2–3 large/broad hashtags + 3–5 medium niche hashtags + 3–4 small/local/specific hashtags
-- All hashtags must be directly relevant to the content and audience
-- No spam hashtags (#like4like, #follow4follow, #instagood used generically, etc.)
-- Do NOT repeat the same hashtag set every post — vary based on the specific content
-- Hashtags should reflect both the content AND the target audience's interests
+HASHTAG RULES — STRICT:
+- Use EXACTLY 5–7 hashtags. Never fewer than 5, never more than 7. Count them before responding.
+- Mix: 1–2 broad hashtags + 2–3 niche/topic hashtags + 1–2 brand/local hashtags
+- Every hashtag must be directly relevant to this specific post's content
+- No spam hashtags (#like4like, #follow4follow, #instagood, #photooftheday used generically)
+- Vary hashtags post to post — do NOT reuse the same set
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${brandContext?.examples.length ? `
 CAPTION EXAMPLES — calibrate VOICE and TONE only. Do NOT copy. Do NOT reference these products or visuals.
@@ -108,7 +107,7 @@ Follow the 3-part structure: Hook → Body → Call to Action.
 - Language: ${s(brandBrain.language, 100)}
 - Tone: ${brandBrain.tone_keywords?.map(k => s(k, 100)).join(', ')}
 
-Then on a new line write: HASHTAGS: followed by 8–12 relevant hashtags (mix of broad, niche, and local).
+Then on a new line write: HASHTAGS: followed by exactly 5–7 relevant hashtags. No more, no less.
 
 Format your response as:
 CAPTION:

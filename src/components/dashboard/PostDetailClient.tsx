@@ -283,6 +283,8 @@ export function PostDetailClient({ post: initialPost }: { post: Post }) {
               </a>
             )}
           </div>
+
+
         </div>
       </div>
       </div>

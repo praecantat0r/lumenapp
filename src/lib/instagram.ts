@@ -17,7 +17,13 @@ export async function publishToInstagram(
     }),
   })
   const containerData = await containerRes.json()
-  if (!containerData.id) throw new Error(`IG container creation failed: ${JSON.stringify(containerData)}`)
+  if (!containerData.id) {
+    const code = containerData?.error?.code
+    if (code === 200 || code === 10) {
+      throw new Error('Instagram permission error — please disconnect and reconnect your Instagram account in Settings, then try again.')
+    }
+    throw new Error(`IG container creation failed: ${JSON.stringify(containerData)}`)
+  }
 
   // Step B: Publish container
   const publishRes = await fetch(`${IG_BASE}/me/media_publish`, {
