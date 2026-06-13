@@ -166,8 +166,19 @@ export function BrandBrainClient({ brandBrain, assets: initialAssets, igConnecti
         sectionRefs.current['schedule']?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         setActiveSection('schedule')
       }, 300)
-      // Clean up the URL without a re-render
       const clean = window.location.pathname
+      window.history.replaceState({}, '', clean)
+    }
+    const igError = params.get('ig_error')
+    if (igError) {
+      const detail: Record<string, string> = {
+        ig_denied: ' (Instagram denied access)',
+        nonce: ' (session expired, try again)',
+        auth: ' (not logged in)',
+        token: ' (token exchange failed)',
+      }
+      toast.error(t('brandBrain.toastIgError') + (detail[igError] ?? ''))
+      const clean = window.location.pathname + (params.get('tab') ? `?tab=${params.get('tab')}` : '')
       window.history.replaceState({}, '', clean)
     }
   }, [])
