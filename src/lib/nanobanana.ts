@@ -32,9 +32,9 @@ export async function prefetchReferenceImages(urls: string[]): Promise<ImagePart
   return results.filter((p): p is ImagePart => p !== null)
 }
 
-async function generateWithDalle(prompt: string): Promise<Buffer | null> {
+async function generateWithDalle(prompt: string): Promise<Buffer> {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return null
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not set')
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 90_000)
@@ -57,19 +57,14 @@ async function generateWithDalle(prompt: string): Promise<Buffer | null> {
       signal: controller.signal,
     })
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      console.error('DALL-E 3 error:', res.status, JSON.stringify(err))
-      return null
-    }
-
     const data = await res.json()
+    if (!res.ok) throw new Error(`DALL-E 3 ${res.status}: ${JSON.stringify(data)}`)
+
     const b64 = data?.data?.[0]?.b64_json
-    if (!b64) return null
+    if (!b64) throw new Error('DALL-E 3 returned no image data')
     return Buffer.from(b64, 'base64')
   } catch (err) {
-    console.error('DALL-E 3 request failed:', err)
-    return null
+    throw err instanceof Error ? err : new Error(String(err))
   } finally {
     clearTimeout(timeout)
   }
@@ -136,21 +131,18 @@ export async function generateImage(
   prefetchedImages?: ImagePart[]
 ): Promise<string> {
   // Try DALL-E 3 first — no reference images needed, just the prompt
-  const dalleBuffer = await generateWithDalle(prompt)
-
   let imageBuffer: Buffer
-  let mimeType: string
+  let mimeType = 'image/png'
 
-  if (dalleBuffer) {
-    imageBuffer = dalleBuffer
-    mimeType = 'image/png'
-  } else {
+  try {
+    imageBuffer = await generateWithDalle(prompt)
+  } catch (dalleErr) {
+    console.error('DALL-E 3 failed, trying Gemini:', dalleErr)
     // Fall back to Gemini with reference images
     const imageParts = prefetchedImages ?? await prefetchReferenceImages(referenceImageUrls)
     const geminiBuffer = await generateWithGemini(prompt, imageParts)
-    if (!geminiBuffer) throw new Error('Image generation failed: both DALL-E 3 and Gemini unavailable')
+    if (!geminiBuffer) throw new Error(`Image generation failed. DALL-E 3: ${dalleErr instanceof Error ? dalleErr.message : String(dalleErr)}`)
     imageBuffer = geminiBuffer
-    mimeType = 'image/png'
   }
 
   const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png'
