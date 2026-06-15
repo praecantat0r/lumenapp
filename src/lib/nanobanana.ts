@@ -52,7 +52,6 @@ async function generateWithDalle(prompt: string): Promise<Buffer> {
         n: 1,
         size: '1024x1024',
         quality: 'hd',
-        response_format: 'b64_json',
       }),
       signal: controller.signal,
     })
@@ -60,9 +59,12 @@ async function generateWithDalle(prompt: string): Promise<Buffer> {
     const data = await res.json()
     if (!res.ok) throw new Error(`DALL-E 3 ${res.status}: ${JSON.stringify(data)}`)
 
-    const b64 = data?.data?.[0]?.b64_json
-    if (!b64) throw new Error('DALL-E 3 returned no image data')
-    return Buffer.from(b64, 'base64')
+    const imageUrl = data?.data?.[0]?.url
+    if (!imageUrl) throw new Error('DALL-E 3 returned no image URL')
+
+    const imgRes = await fetch(imageUrl)
+    if (!imgRes.ok) throw new Error(`Failed to fetch DALL-E 3 image: ${imgRes.status}`)
+    return Buffer.from(await imgRes.arrayBuffer())
   } catch (err) {
     throw err instanceof Error ? err : new Error(String(err))
   } finally {
