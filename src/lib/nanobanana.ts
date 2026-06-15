@@ -47,11 +47,11 @@ async function generateWithDalle(prompt: string): Promise<Buffer> {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
+        model: 'gpt-image-1',
         prompt,
         n: 1,
         size: '1024x1024',
-        quality: 'hd',
+        quality: 'high',
       }),
       signal: controller.signal,
     })
@@ -59,12 +59,16 @@ async function generateWithDalle(prompt: string): Promise<Buffer> {
     const data = await res.json()
     if (!res.ok) throw new Error(`DALL-E 3 ${res.status}: ${JSON.stringify(data)}`)
 
-    const imageUrl = data?.data?.[0]?.url
-    if (!imageUrl) throw new Error('DALL-E 3 returned no image URL')
+    const item = data?.data?.[0]
+    if (!item) throw new Error('gpt-image-1 returned no image data')
 
-    const imgRes = await fetch(imageUrl)
-    if (!imgRes.ok) throw new Error(`Failed to fetch DALL-E 3 image: ${imgRes.status}`)
-    return Buffer.from(await imgRes.arrayBuffer())
+    if (item.b64_json) return Buffer.from(item.b64_json, 'base64')
+    if (item.url) {
+      const imgRes = await fetch(item.url)
+      if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`)
+      return Buffer.from(await imgRes.arrayBuffer())
+    }
+    throw new Error('gpt-image-1 returned neither b64_json nor url')
   } catch (err) {
     throw err instanceof Error ? err : new Error(String(err))
   } finally {
