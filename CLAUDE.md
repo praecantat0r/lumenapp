@@ -14,6 +14,8 @@ npm run start    # Start production server
 
 No test or lint commands are configured.
 
+ahoj
+
 ## Architecture
 
 **Lumen** is an AI-powered Instagram content generation SaaS. Users define their brand once; the system generates, renders, and publishes daily posts automatically.
