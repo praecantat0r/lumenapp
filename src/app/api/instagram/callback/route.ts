@@ -10,30 +10,20 @@ export async function GET(req: NextRequest) {
   const [stateNonce, from = 'settings'] = rawState.split('|')
   const error = searchParams.get('error')
 
-  function buildErrorRedirect(errorCode: string) {
-    const base = from === 'onboarding'
-      ? '/dashboard/overview'
-      : '/dashboard/brand-brain?tab=settings'
-    const sep = base.includes('?') ? '&' : '?'
-    return `${base}${sep}ig_error=${errorCode}`
-  }
+  const errorRedirect = from === 'onboarding'
+    ? '/dashboard/overview?ig_error=1'
+    : '/dashboard/brand-brain?tab=settings&ig_error=1'
 
   // Verify CSRF nonce
   const cookieNonce = req.cookies.get('ig_oauth_nonce')?.value
-  if (error) {
-    console.error('IG OAuth error from Instagram:', error, searchParams.get('error_description'))
-    return NextResponse.redirect(new URL(buildErrorRedirect('ig_denied'), process.env.NEXT_PUBLIC_APP_URL!))
-  }
-  if (!code || !stateNonce || !cookieNonce || stateNonce !== cookieNonce) {
-    console.error('IG nonce check failed', { code: !!code, stateNonce, cookieNonce, match: stateNonce === cookieNonce })
-    return NextResponse.redirect(new URL(buildErrorRedirect('nonce'), process.env.NEXT_PUBLIC_APP_URL!))
+  if (error || !code || !stateNonce || !cookieNonce || stateNonce !== cookieNonce) {
+    return NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
   }
 
   // Get userId from the authenticated session, not from state
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    console.error('IG callback: no authenticated user in session')
-    return NextResponse.redirect(new URL(buildErrorRedirect('auth'), process.env.NEXT_PUBLIC_APP_URL!))
+    return NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
   }
   const userId = user.id
 
@@ -99,7 +89,7 @@ export async function GET(req: NextRequest) {
     return res
   } catch (err) {
     console.error('IG callback error:', err)
-    const res = NextResponse.redirect(new URL(buildErrorRedirect('token'), process.env.NEXT_PUBLIC_APP_URL!))
+    const res = NextResponse.redirect(new URL(errorRedirect, process.env.NEXT_PUBLIC_APP_URL!))
     res.cookies.delete('ig_oauth_nonce')
     return res
   }

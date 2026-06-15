@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (!rateLimit(`gen:${user.id}`, 10, 60_000)) return rateLimitResponse()
 
   // Parse request body early — assetMode is needed for the composite plan check below
-  let assetMode: 'original' | 'specific' | 'auto' | 'composite' = 'original'
+  let assetMode: 'original' | 'specific' | 'auto' | 'composite' | 'custom' = 'original'
   let selectedAssetUrl: string | undefined
   let selectedAssetName: string | undefined
   let selectedAssetType: string | undefined
@@ -31,9 +31,11 @@ export async function POST(req: NextRequest) {
   let productAssetUrl: string | undefined
   let productAssetName: string | undefined
   let productAssetDescription: string | undefined
+  let customImagePrompt: string | undefined
   try {
     const body = await req.json().catch(() => ({}))
     if (body.assetMode)             assetMode             = body.assetMode
+    if (body.customImagePrompt)     customImagePrompt     = body.customImagePrompt
     if (body.assetUrl)              selectedAssetUrl      = body.assetUrl
     if (body.assetName)             selectedAssetName     = body.assetName
     if (body.assetType)             selectedAssetType     = body.assetType
@@ -303,6 +305,24 @@ export async function POST(req: NextRequest) {
     let bestHashtags: string | undefined
     let bestValidationFeedback: string | undefined
 
+    if (assetMode === 'custom' && customImagePrompt) {
+      image_prompt = customImagePrompt
+      visual_concept = customImagePrompt.split(/[.!?]/)[0]?.trim() ?? customImagePrompt.slice(0, 200)
+      selectedShotStyle = 'custom'
+      template_layers = { title: '', subtitle: '', cta: '', brand_name: bb.brand_name }
+      validationAttempts = 0
+      validationScore = 1
+
+      try {
+        ;({ caption, hashtags } = await generateCaption(bb as BrandBrain, visual_concept, brandContext, undefined, undefined, 'original'))
+      } catch (err) {
+        await save({ image_prompt, template_layers }, true)
+        return NextResponse.json({ error: 'Caption generation failed: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 })
+      }
+
+      await save({ image_prompt, template_layers, caption, hashtags })
+    } else {
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       validationAttempts = attempt
 
@@ -320,7 +340,7 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        ;({ caption, hashtags } = await generateCaption(bb as BrandBrain, visual_concept, brandContext, validationFeedback, assetNote, assetMode))
+        ;({ caption, hashtags } = await generateCaption(bb as BrandBrain, visual_concept, brandContext, validationFeedback, assetNote, assetMode as 'original' | 'specific' | 'auto' | 'composite'))
       } catch (err) {
         await save({ image_prompt, template_layers }, true)
         return NextResponse.json({ error: 'Caption generation failed: ' + (err instanceof Error ? err.message : String(err)) }, { status: 500 })
@@ -380,6 +400,8 @@ export async function POST(req: NextRequest) {
     }
 
     await save({ image_prompt, template_layers, caption, hashtags })
+
+    } // end else (non-custom modes)
 
     // ── Step 3: AI image ────────────────────────────────────────────────────
     // Append hard negative constraints to the prompt before sending to Gemini.

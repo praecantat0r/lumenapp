@@ -1345,3 +1345,63 @@ Respond ONLY with valid JSON: { "image_prompt": "..." }`
   }
   throw lastErr
 }
+
+export async function enhanceUserPrompt(
+  description: string,
+  brandBrain: BrandBrain,
+): Promise<{ variations: string[] }> {
+  const category = classifyIndustry(brandBrain.industry)
+  const photoGuide = buildIndustryPhotographyGuide(category)
+  const brandProfile = getBrandProfile(brandBrain)
+
+  const system = `${brandProfile}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ROLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You are a professional commercial photography director. Given a brief image idea from the brand owner, you expand it into rich, cinematic, technically detailed image generation prompts that match the brand's visual identity and the photography standards below.
+
+${photoGuide}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+— Generate exactly 3 distinct variations. Each must be visually different (different angle, lighting, or setting) while staying true to the brief.
+— Each variation: 150–250 words, a single flowing paragraph of cinematic image prompt prose.
+— Do NOT name the brand or include text overlays, watermarks, or people unless the brand explicitly allows it.
+— End every variation with: "ultra-photorealistic commercial photography, 4:5 vertical Instagram format, no text overlays, no watermarks"
+— Return ONLY valid JSON: { "variations": ["...", "...", "..."] }`
+
+  const userTurn = `User's image brief: ${sanitizeForPrompt(description, 500)}
+
+Generate 3 distinct expanded cinematic image prompts based on this brief. Return valid JSON only: { "variations": ["...", "...", "..."] }`
+
+  const anthropic = getClient()
+  let lastErr: unknown
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 4000 * attempt))
+    try {
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        temperature: 1,
+        system,
+        messages: [{ role: 'user', content: userTurn }],
+      })
+      const raw = message.content[0].type === 'text' ? message.content[0].text : ''
+      const start = raw.indexOf('{')
+      const end = raw.lastIndexOf('}')
+      if (start === -1 || end === -1) throw new Error('No JSON in response')
+      const parsed = JSON.parse(raw.slice(start, end + 1))
+      if (!Array.isArray(parsed.variations) || parsed.variations.length === 0) {
+        throw new Error('Invalid variations in response')
+      }
+      return { variations: parsed.variations.slice(0, 3).map((v: unknown) => String(v)) }
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status
+      if (!status || status === 429 || status >= 500) { lastErr = err; continue }
+      throw err
+    }
+  }
+  throw lastErr
+}

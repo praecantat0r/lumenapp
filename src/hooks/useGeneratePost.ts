@@ -2,7 +2,7 @@
 import { useState } from 'react'
 
 export type GenerateConfig = {
-  assetMode: 'original' | 'auto' | 'specific' | 'composite'
+  assetMode: 'original' | 'auto' | 'specific' | 'composite' | 'custom'
   assetUrl?: string
   assetName?: string
   assetType?: string
@@ -13,6 +13,7 @@ export type GenerateConfig = {
   productAssetUrl?: string
   productAssetName?: string
   productAssetDescription?: string
+  customImagePrompt?: string
 }
 
 const MAX_POLL_ATTEMPTS = 100
