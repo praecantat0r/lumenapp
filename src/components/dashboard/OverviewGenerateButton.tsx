@@ -33,6 +33,21 @@ export function OverviewGenerateButton({ brandAssets }: { brandAssets: BrandAsse
 
   return (
     <>
+      <style>{`
+        .ovg-btn {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 10px 18px;
+          background: rgba(182,141,64,0.12);
+          color: var(--candle); border: 1px solid rgba(182,141,64,0.25);
+          border-radius: 9999px; font-size: 13px; font-weight: 700;
+          font-family: var(--font-syne);
+          transition: all 0.15s; white-space: nowrap;
+        }
+        @media (max-width: 767px) {
+          .ovg-btn { padding: 8px 12px; font-size: 11px; gap: 5px; }
+          .ovg-btn .material-symbols-outlined { font-size: 14px !important; }
+        }
+      `}</style>
       {showModal && (
         <GeneratePostModal
           brandAssets={brandAssets}
@@ -42,16 +57,10 @@ export function OverviewGenerateButton({ brandAssets }: { brandAssets: BrandAsse
       )}
       {generating && <GeneratingModal step={genStep} />}
       <button
+        className="ovg-btn"
         onClick={() => setShowModal(true)}
         disabled={generating}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '10px 18px', background: 'rgba(182,141,64,0.12)',
-          color: 'var(--candle)', border: '1px solid rgba(182,141,64,0.25)',
-          borderRadius: 9999, fontSize: 13, fontWeight: 700,
-          fontFamily: 'var(--font-syne)',
-          cursor: generating ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
-        }}
+        style={{ cursor: generating ? 'not-allowed' : 'pointer' }}
       >
         {generating ? (
           <span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'ovg-spin 1.4s linear infinite', display: 'inline-block' }}>autorenew</span>

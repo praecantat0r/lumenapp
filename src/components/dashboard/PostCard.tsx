@@ -23,7 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
   generating:     'GENERATING',
 }
 
-export function PostCard({ post, onClick }: { post: Post; onClick?: () => void }) {
+export function PostCard({ post, onClick, onDelete }: { post: Post; onClick?: () => void; onDelete?: (id: string) => void }) {
   const router = useRouter()
   const { t }  = useLanguage()
   const sc     = getStatusConfig(post.status)
@@ -55,6 +55,7 @@ export function PostCard({ post, onClick }: { post: Post; onClick?: () => void }
         .pc-action { transition: background 0.15s; }
         .pc-action:hover { background: rgba(78,69,56,0.4) !important; }
         .pc-action-gold:hover { background: rgba(182,141,64,0.2) !important; }
+        .pc-action-del:hover { background: rgba(255,100,80,0.15) !important; color: #ffb4ab !important; }
         [data-theme="light"] .pc-type-icon { background: rgba(255,255,255,0.82) !important; border-color: rgba(210,197,179,0.5) !important; }
         [data-theme="light"] .pc-type-icon span { color: #7b580d !important; }
       `}</style>
@@ -146,7 +147,7 @@ export function PostCard({ post, onClick }: { post: Post; onClick?: () => void }
                 format(new Date(post.created_at), 'MMM d, yyyy')
               )}
             </span>
-            <div style={{ display: 'flex', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               {post.status === 'pending_review' && (
                 <>
                   <button
@@ -201,6 +202,16 @@ export function PostCard({ post, onClick }: { post: Post; onClick?: () => void }
                   style={{ padding: 6, borderRadius: 9999, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', color: '#ffb4ab' }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  className="pc-action pc-action-del"
+                  onClick={e => { e.stopPropagation(); onDelete(post.id) }}
+                  style={{ padding: 6, borderRadius: 9999, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', color: 'var(--muted)', transition: 'color 150ms, background 150ms' }}
+                  title="Delete post"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
                 </button>
               )}
             </div>

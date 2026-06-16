@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { PostCard } from './PostCard'
@@ -17,20 +17,22 @@ import { getStatusConfig } from '@/lib/post-status'
 
 type Filter = 'all' | 'pending_review' | 'approved' | 'published' | 'failed'
 
+const PAGE_SIZE = 24
+
 interface Props {
   posts: Post[]
-  counts: { all: number; pending_review: number; approved: number; published: number; failed: number }
   brandAssets: BrandAsset[]
   initialQuery?: string
   initialFilter?: string
-  page: number
-  totalPages: number
+  initialPage?: number
 }
 
-export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQuery = '', initialFilter = 'all', page, totalPages }: Props) {
+export function PostsClient({ posts: initialPosts, brandAssets, initialQuery = '', initialFilter = 'all', initialPage = 1 }: Props) {
   const router                = useRouter()
   const { t } = useLanguage()
   const [query, setQuery]     = useState(initialQuery)
+  const [filter, setFilter]   = useState(initialFilter as Filter)
+  const [currentPage, setCurrentPage] = useState(initialPage)
   const [selected, setSelected] = useState<Post | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
@@ -53,19 +55,56 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
     (msg) => toast.error(msg),
   )
 
-  const filter = initialFilter as Filter
+  // Counts derived from all posts — no server round-trip needed
+  const counts = useMemo(() => {
+    const c = { all: 0, pending_review: 0, approved: 0, published: 0, failed: 0 }
+    for (const p of posts) {
+      c.all++
+      if (p.status === 'pending_review') c.pending_review++
+      else if (p.status === 'approved') c.approved++
+      else if (p.status === 'published') c.published++
+      else if (p.status === 'failed') c.failed++
+    }
+    return c
+  }, [posts])
 
-  function navigate(f: Filter, p = 1, q?: string) {
+  // Filter + search done entirely in the browser — instant
+  const filtered = useMemo(() => {
+    let result = posts
+    if (filter !== 'all') result = result.filter(p => p.status === filter)
+    if (query.trim()) {
+      const q = query.toLowerCase()
+      result = result.filter(p =>
+        p.caption?.toLowerCase().includes(q) ||
+        p.hashtags?.toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [posts, filter, query])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const page = Math.min(currentPage, totalPages || 1)
+  const paginatedPosts = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  function updateURL(f: Filter, p: number, q: string) {
     const params = new URLSearchParams()
     if (f !== 'all') params.set('filter', f)
     if (p > 1) params.set('page', String(p))
-    const searchQ = q !== undefined ? q : query
-    if (searchQ) params.set('q', searchQ)
+    if (q) params.set('q', q)
     const qs = params.toString()
-    router.push(`/dashboard/posts${qs ? `?${qs}` : ''}`)
+    window.history.replaceState(null, '', `/dashboard/posts${qs ? `?${qs}` : ''}`)
   }
 
-  const filtered = posts
+  function changeFilter(f: Filter) {
+    setFilter(f)
+    setCurrentPage(1)
+    updateURL(f, 1, query)
+  }
+
+  function changePage(p: number) {
+    setCurrentPage(p)
+    updateURL(filter, p, query)
+  }
 
   function openDetail(post: Post) { setSelected(post); setPanelOpen(true) }
   function closeDetail() { setPanelOpen(false); setTimeout(() => setSelected(null), 300) }
@@ -146,7 +185,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
             { id: 'published',      label: t('posts.filterPublished'), count: counts.published,      countColor: '#7AABFF' },
             { id: 'failed',         label: t('posts.filterFailed'),    count: counts.failed,         countColor: '#ffb4ab' },
           ] as const).map(chip => (
-            <button key={chip.id} onClick={() => navigate(chip.id as Filter, 1)} className={`pt-chip${filter === chip.id ? ' pt-active' : ''}`}>
+            <button key={chip.id} onClick={() => changeFilter(chip.id as Filter)} className={`pt-chip${filter === chip.id ? ' pt-active' : ''}`}>
               {chip.label}
               {chip.count > 0 && (
                 <span style={{
@@ -169,7 +208,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
               const val = e.target.value
               setQuery(val)
               if (searchDebounce.current) clearTimeout(searchDebounce.current)
-              searchDebounce.current = setTimeout(() => navigate(filter, 1, val), 400)
+              searchDebounce.current = setTimeout(() => { setCurrentPage(1); updateURL(filter, 1, val) }, 400)
             }}
             placeholder={t('posts.searchPlaceholder')}
             className="pt-search-input"
@@ -187,9 +226,9 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
 
       {/* ── Grid ── */}
       <div className="pt-content" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px 48px', background: 'var(--carbon)' }}>
-        {filtered.length > 0 ? (
+        {paginatedPosts.length > 0 ? (
           <div className="pt-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
-            {filtered.map(post => <PostCard key={post.id} post={post} onClick={() => openDetail(post)} />)}
+            {paginatedPosts.map(post => <PostCard key={post.id} post={post} onClick={() => openDetail(post)} onDelete={deletePost} />)}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px', textAlign: 'center' }}>
@@ -204,7 +243,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
         {/* ── Pagination ── */}
         {totalPages > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 40 }}>
-            <button className="pt-page-btn" disabled={page <= 1} onClick={() => navigate(filter, page - 1)}>
+            <button className="pt-page-btn" disabled={page <= 1} onClick={() => changePage(page - 1)}>
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -218,17 +257,46 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
                 p === 'ellipsis' ? (
                   <span key={`e${i}`} style={{ color: 'var(--muted)', fontSize: 13, padding: '0 4px' }}>…</span>
                 ) : (
-                  <button key={p} className={`pt-page-btn${p === page ? ' pt-page-active' : ''}`} onClick={() => navigate(filter, p as number)}>
+                  <button key={p} className={`pt-page-btn${p === page ? ' pt-page-active' : ''}`} onClick={() => changePage(p as number)}>
                     {p}
                   </button>
                 )
               )}
-            <button className="pt-page-btn" disabled={page >= totalPages} onClick={() => navigate(filter, page + 1)}>
+            <button className="pt-page-btn" disabled={page >= totalPages} onClick={() => changePage(page + 1)}>
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
             </button>
           </div>
         )}
       </div>
+
+      <style>{`
+        .pt-panel {
+          position: fixed; top: 0; right: 0; bottom: 0;
+          width: 460px;
+          background: var(--surface-2);
+          border-left: 1px solid rgba(78,69,56,0.3);
+          display: flex; flex-direction: column;
+          transition: transform .32s cubic-bezier(.4,0,.2,1);
+          z-index: 100; overflow: hidden;
+          transform: translateX(100%);
+        }
+        .pt-panel.open { transform: translateX(0); }
+
+        @media (max-width: 767px) {
+          .pt-panel {
+            top: auto; left: 0; right: 0;
+            width: 100%; height: 90dvh;
+            border-left: none;
+            border-top: 1px solid rgba(78,69,56,0.25);
+            border-radius: 20px 20px 0 0;
+            transform: translateY(100%);
+          }
+          .pt-panel.open { transform: translateY(0); }
+          .pt-panel-img { aspect-ratio: 16/9 !important; }
+          .pt-panel-drag { display: flex !important; }
+        }
+        .pt-panel-drag { display: none; justify-content: center; padding: 10px 0 4px; flex-shrink: 0; }
+      `}</style>
 
       {/* ── Detail backdrop ── */}
       <div
@@ -237,7 +305,11 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
       />
 
       {/* ── Detail panel ── */}
-      <div className="pt-detail-panel" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 460, background: 'var(--surface-2)', borderLeft: '1px solid rgba(78,69,56,0.3)', display: 'flex', flexDirection: 'column', transform: panelOpen ? 'translateX(0)' : 'translateX(100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', zIndex: 100, overflow: 'hidden' }}>
+      <div className={`pt-panel${panelOpen ? ' open' : ''}`}>
+        {/* Drag handle — visible only on mobile via CSS */}
+        <div className="pt-panel-drag">
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(78,69,56,0.45)' }} />
+        </div>
         {selected && (
           <>
             {/* Header */}
@@ -266,7 +338,7 @@ export function PostsClient({ posts: initialPosts, counts, brandAssets, initialQ
             {/* Scrollable body */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {/* Image */}
-              <div style={{ aspectRatio: '4/5', overflow: 'hidden', flexShrink: 0, position: 'relative', background: 'var(--surface-2)' }}>
+              <div className="pt-panel-img" style={{ aspectRatio: '4/5', overflow: 'hidden', flexShrink: 0, position: 'relative', background: 'var(--surface-2)' }}>
                 {selected.render_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={selected.render_url} alt="Post" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />

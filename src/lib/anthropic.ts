@@ -210,7 +210,7 @@ Requirements:
   • Para 3 (optional) — brand angle or deeper insight
   • Final line — subtle call-to-action (1 sentence, not a command)
 
-Then on a new line write: HASHTAGS: followed by 20-25 relevant hashtags.
+Then on a new line write: HASHTAGS: followed by 5-8 relevant hashtags (no more than 8).
 
 Format your response as:
 CAPTION:

@@ -742,38 +742,6 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
                     </div>
                   )}
 
-                  {/* Scene settings */}
-                  {selectedPhoto.settings && Object.keys(selectedPhoto.settings).length > 0 && (() => {
-                    const s = selectedPhoto.settings as SceneSettings
-                    return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4, borderTop: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 2 }}>Scene Settings</div>
-                        {selectedPhoto.asset_mode && <SettingRow label="Mode" value={selectedPhoto.asset_mode === 'composite' ? 'Composite' : 'Use Asset'} />}
-                        {selectedPhoto.asset_name && <SettingRow label="Asset" value={selectedPhoto.asset_name} />}
-                        {selectedPhoto.scenic_asset_name && <SettingRow label="Scene" value={selectedPhoto.scenic_asset_name} />}
-                        {selectedPhoto.product_asset_name && <SettingRow label="Product" value={selectedPhoto.product_asset_name} />}
-                        {s.lightingIntensity !== undefined && <SettingRow label="Light Intensity" value={`${s.lightingIntensity}%`} />}
-                        {s.lightingDirection !== undefined && <SettingRow label="Light Direction" value={directionLabel(s.lightingDirection)} />}
-                        {s.lightingType && <SettingRow label="Light Type" value={s.lightingType.charAt(0).toUpperCase() + s.lightingType.slice(1)} />}
-                        {s.colorTemperature !== undefined && s.colorTemperature !== 0 && <SettingRow label="Temperature" value={tempLabel(s.colorTemperature)} />}
-                        {s.saturation !== undefined && s.saturation !== 0 && <SettingRow label="Saturation" value={`${s.saturation > 0 ? '+' : ''}${s.saturation}`} />}
-                        {s.contrast !== undefined && s.contrast !== 0 && <SettingRow label="Contrast" value={`${s.contrast > 0 ? '+' : ''}${s.contrast}`} />}
-                        {s.exposure !== undefined && s.exposure !== 0 && <SettingRow label="Exposure" value={`${s.exposure > 0 ? '+' : ''}${s.exposure}`} />}
-                        {s.sceneType && <SettingRow label="Scene Type" value={s.sceneType.charAt(0).toUpperCase() + s.sceneType.slice(1)} />}
-                        {s.backgroundType && <SettingRow label="Background" value={{ color: 'Solid Color', gradient: 'Gradient', ai: 'AI Prompt', photo: 'Photo' }[s.backgroundType] ?? s.backgroundType} />}
-                        {s.backgroundType === 'photo' && s.backgroundPhotoName && <SettingRow label="BG Photo" value={s.backgroundPhotoName} />}
-                        {s.viewAngle && <SettingRow label="View Angle" value={s.viewAngle.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} />}
-                        {s.productPosition && <SettingRow label="Position" value={s.productPosition.charAt(0).toUpperCase() + s.productPosition.slice(1)} />}
-                        {s.zoom !== undefined && <SettingRow label="Zoom" value={zoomLabel(s.zoom)} />}
-                        {s.customPrompt && (
-                          <div>
-                            <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 4 }}>Custom Prompt</div>
-                            <div style={{ fontSize: 11, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', lineHeight: 1.6, padding: '7px 10px', borderRadius: 6, background: 'rgba(212,168,75,.04)', border: '1px solid rgba(212,168,75,.1)' }}>{s.customPrompt}</div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })()}
                 </div>
               </aside>
             )}

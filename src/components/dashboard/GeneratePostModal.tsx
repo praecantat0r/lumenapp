@@ -40,45 +40,14 @@ interface Props {
 }
 
 export function GeneratePostModal({ brandAssets, onGenerate, onClose }: Props) {
-  const [tab, setTab] = useState<'original' | 'asset' | 'composite' | 'describe'>('original')
+  const [tab, setTab] = useState<'original' | 'asset' | 'composite'>('original')
   const [assetChoice, setAssetChoice] = useState<'auto' | string>('auto')
   const [compositeScenicId,  setCompositeScenicId]  = useState('')
   const [compositeProductId, setCompositeProductId] = useState('')
   const [scenicFilter,  setScenicFilter]  = useState<'scenic' | 'all'>('scenic')
   const [productFilter, setProductFilter] = useState<'product' | 'all'>('product')
   const [mounted, setMounted] = useState(false)
-  const [describeInput, setDescribeInput] = useState('')
-  const [variations, setVariations] = useState<string[]>([])
-  const [activeVariation, setActiveVariation] = useState(0)
-  const [editedPrompt, setEditedPrompt] = useState('')
-  const [enhancing, setEnhancing] = useState(false)
   useEffect(() => { setMounted(true) }, [])
-
-  async function handleEnhance() {
-    setEnhancing(true)
-    try {
-      const res = await fetch('/api/generate/enhance-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: describeInput }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to enhance')
-      setVariations(data.variations)
-      setActiveVariation(0)
-      setEditedPrompt(data.variations[0])
-    } catch {
-      // keep existing state on error
-    } finally {
-      setEnhancing(false)
-    }
-  }
-
-  function goVariation(dir: 1 | -1) {
-    const next = (activeVariation + dir + variations.length) % variations.length
-    setActiveVariation(next)
-    setEditedPrompt(variations[next])
-  }
 
   const hasAssets = brandAssets.length > 0
   const compositeScenicAsset  = brandAssets.find(a => a.id === compositeScenicId)
@@ -86,9 +55,7 @@ export function GeneratePostModal({ brandAssets, onGenerate, onClose }: Props) {
   const compositeReady = !!compositeScenicId && !!compositeProductId
 
   function handleGenerate() {
-    if (tab === 'describe') {
-      onGenerate({ assetMode: 'custom', customImagePrompt: editedPrompt || describeInput })
-    } else if (tab === 'original') {
+    if (tab === 'original') {
       onGenerate({ assetMode: 'original' })
     } else if (tab === 'composite') {
       onGenerate({
@@ -139,8 +106,7 @@ export function GeneratePostModal({ brandAssets, onGenerate, onClose }: Props) {
 
   const generateDisabled =
     (tab === 'asset' && !hasAssets) ||
-    (tab === 'composite' && !compositeReady) ||
-    (tab === 'describe' && !editedPrompt.trim() && !describeInput.trim())
+    (tab === 'composite' && !compositeReady)
 
   const modal = (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(11,10,5,0.8)', backdropFilter: 'blur(10px)' }}>
@@ -197,95 +163,12 @@ export function GeneratePostModal({ brandAssets, onGenerate, onClose }: Props) {
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="6" width="13" height="8.5" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><rect x="4" y="2" width="8" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.2" opacity=".55"/></svg>
             Composite
           </button>
-          <button className={`gpm-tab${tab === 'describe' ? ' active' : ''}`} onClick={() => setTab('describe')}>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 12.5V14h1.5l7-7L9 5.5l-7 7z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M11.5 3.5l1 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-            Describe
-          </button>
         </div>
 
         {/* Scrollable body */}
         <div className="gpm-body" style={{ flex: 1, overflowY: 'auto', padding: '18px 24px' }}>
 
-          {tab === 'describe' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Seed input */}
-              <div>
-                <div className="gpm-picker-label">Your image idea</div>
-                <textarea
-                  value={describeInput}
-                  onChange={e => setDescribeInput(e.target.value)}
-                  placeholder="e.g. a red sports car parked in the rain at night, reflections on wet asphalt…"
-                  rows={3}
-                  style={{ width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', fontSize: 12, fontWeight: 300, lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms' }}
-                  onFocus={e => { e.currentTarget.style.borderColor = 'rgba(212,168,75,.4)' }}
-                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                />
-              </div>
-
-              {/* Enhance button */}
-              <button
-                onClick={handleEnhance}
-                disabled={!describeInput.trim() || enhancing}
-                style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', background: 'rgba(212,168,75,.1)', border: '1px solid rgba(212,168,75,.3)', borderRadius: 8, color: enhancing || !describeInput.trim() ? 'var(--muted)' : 'var(--candle)', fontFamily: 'var(--font-ibm)', fontSize: 12, fontWeight: 500, cursor: !describeInput.trim() || enhancing ? 'not-allowed' : 'pointer', transition: 'all 150ms', opacity: !describeInput.trim() ? 0.45 : 1 }}
-                onMouseEnter={e => { if (describeInput.trim() && !enhancing) e.currentTarget.style.background = 'rgba(212,168,75,.16)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(212,168,75,.1)' }}
-              >
-                {enhancing ? (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ animation: 'spin 1s linear infinite' }}><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="14 8" strokeLinecap="round"/></svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.3 3.3l2.1 2.1M10.6 10.6l2.1 2.1M3.3 12.7l2.1-2.1M10.6 5.4l2.1-2.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                )}
-                {enhancing ? 'Expanding…' : 'Enhance with AI'}
-              </button>
-
-              {/* Skeleton while loading */}
-              {enhancing && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10 }}>
-                  {[100, 85, 92].map((w, i) => (
-                    <div key={i} style={{ height: 12, borderRadius: 4, background: 'rgba(255,255,255,.07)', width: `${w}%`, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 120}ms` }} />
-                  ))}
-                </div>
-              )}
-
-              {/* Variation card */}
-              {!enhancing && variations.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {/* Arrow switcher */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <button
-                      onClick={() => goVariation(-1)}
-                      style={{ width: 32, height: 32, borderRadius: 6, background: 'transparent', border: '1px solid var(--border)', color: 'var(--candle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border-color 150ms' }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(212,168,75,.4)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="6.5,2 3.5,5 6.5,8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
-                    <span style={{ fontFamily: 'var(--font-ibm)', fontSize: 11, color: 'var(--candle)', letterSpacing: '.06em', minWidth: 36, textAlign: 'center' }}>{activeVariation + 1} / {variations.length}</span>
-                    <button
-                      onClick={() => goVariation(1)}
-                      style={{ width: 32, height: 32, borderRadius: 6, background: 'transparent', border: '1px solid var(--border)', color: 'var(--candle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border-color 150ms' }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(212,168,75,.4)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="3.5,2 6.5,5 3.5,8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
-                    <span style={{ fontFamily: 'var(--font-ibm)', fontSize: 10, color: 'var(--muted)', letterSpacing: '.04em' }}>Edit freely below</span>
-                  </div>
-
-                  {/* Editable prompt */}
-                  <textarea
-                    value={editedPrompt}
-                    onChange={e => setEditedPrompt(e.target.value)}
-                    rows={7}
-                    style={{ width: '100%', background: 'var(--surface-2)', border: '1px solid rgba(212,168,75,.25)', borderRadius: 8, padding: '12px 14px', color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', fontSize: 11, fontWeight: 300, lineHeight: 1.7, resize: 'vertical', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms' }}
-                    onFocus={e => { e.currentTarget.style.borderColor = 'rgba(212,168,75,.5)' }}
-                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(212,168,75,.25)' }}
-                  />
-                </div>
-              )}
-            </div>
-
-          ) : tab === 'original' ? (
+          {tab === 'original' ? (
             <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(212,168,75,.1)', border: '1px solid rgba(212,168,75,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.3 3.3l2.1 2.1M10.6 10.6l2.1 2.1M3.3 12.7l2.1-2.1M10.6 5.4l2.1-2.1" stroke="#D4A84B" strokeWidth="1.3" strokeLinecap="round"/></svg>
