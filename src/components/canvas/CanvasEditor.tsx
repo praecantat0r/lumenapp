@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
 
@@ -55,7 +55,7 @@ const FILTER_PRESETS = [
   { name: 'B&W',       label: 'B&W',       swatch: 'linear-gradient(135deg,#fff,#333)',              adj: [{t:'s',v:-100}] },
 ] as const
 
-type LeftTab = 'canvas' | 'text' | 'media' | 'shapes' | 'layers'
+type FlyoutId = 'text' | 'media' | 'shapes' | 'layers'
 
 export interface LiveLayer {
   lumenId: string
@@ -102,6 +102,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   const panOffsetRef   = useRef({ x: 0, y: 0 })        // accumulated pan offset for transform-based panning
   const serializing    = useRef(false)                  // guard: blocks pushUndo during reload / snapshot capture
   const lastSavedState = useRef<string>('')             // canvas JSON of the last settled state (BEFORE the next action)
+  const flyoutRef      = useRef<HTMLDivElement>(null)
 
   const [ready, setReady]               = useState(false)
   const [selectedObj, setSelectedObj]   = useState<any>(null)
@@ -112,9 +113,9 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   const [assetsLoading, setAssetsLoading] = useState(false)
   const [error, setError]               = useState<string | null>(null)
   const [canvasScale, setCanvasScale]   = useState(1)
-  const [activeLeftTab, setActiveLeftTab] = useState<LeftTab>('canvas')
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 767 : true)
-  const [rightPanelMinimized, setRightPanelMinimized] = useState(typeof window !== 'undefined' ? window.innerWidth <= 767 : false)
+  const [leftFlyout, setLeftFlyout] = useState<FlyoutId | null>(null)
+  const [rightDockOpen, setRightDockOpen] = useState(false)
+  const [rightDockTab, setRightDockTab] = useState<'properties' | 'effects'>('properties')
   const [layers, setLayers]             = useState<LiveLayer[]>([])
 
   // Text properties
@@ -142,10 +143,9 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   const [effectContrast,   setEffectContrast]   = useState(0)   // -100 to 100
 
   // Preview mode
-  const [isPreview, setIsPreview] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
 
-  // Effects popover
-  const [showEffects, setShowEffects] = useState(false)
+  // Effects panel state
   const [effectsTab, setEffectsTab]   = useState<'blur' | 'filters' | 'adjust'>('blur')
   const [blurType, setBlurType]           = useState<BlurType>('gaussian')
   const [activePreset, setActivePreset]   = useState<string | null>(null)
@@ -159,7 +159,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
   useEffect(() => {
     const canvas = fabricRef.current
     if (!canvas) return
-    if (isPreview) {
+    if (previewMode) {
       canvas.discardActiveObject()
       canvas.selection = false
       canvas.getObjects().forEach((o: any) => { o.selectable = false; o.evented = false })
@@ -173,7 +173,7 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       })
       canvas.renderAll()
     }
-  }, [isPreview])
+  }, [previewMode])
 
   // Google Fonts are now injected inside init() so we can await the link load
   // before calling document.fonts.load() — leaving this comment as a marker.
@@ -1142,8 +1142,8 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
       serializing.current = false
 
 
-      canvas.on('selection:created', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
-      canvas.on('selection:updated', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightPanelMinimized(false) })
+      canvas.on('selection:created', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightDockOpen(true) })
+      canvas.on('selection:updated', () => { setSelectedObj(canvas.getActiveObject() ?? null); if (window.innerWidth > 767) setRightDockOpen(true) })
       canvas.on('selection:cleared', () => setSelectedObj(null))
 
       canvas.on('object:added',    () => { refreshLayers(); pushUndo() })
@@ -1513,7 +1513,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     if (!selectedObj) return
     selectedObj.set('fill', color)
     fabricRef.current?.requestRenderAll()
-    pushUndo()
   }
 
   function updateFontSize(size: number) {
@@ -1599,7 +1598,6 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     setStrokeColor(color)
     setStrokeWidth(width)
     fabricRef.current?.requestRenderAll()
-    pushUndo()
   }
 
   function updateRadius(val: number) {
@@ -1868,117 +1866,262 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
     userSelect: 'none',
   })
 
+  // ── Toggle right dock with one-shot scale transition ─────────────────────────
+  function toggleDock(open: boolean, tab?: 'properties' | 'effects') {
+    if (tab) setRightDockTab(tab)
+    if (canvasInnerRef.current) canvasInnerRef.current.style.transition = 'transform 200ms ease'
+    setRightDockOpen(open)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (canvasInnerRef.current) canvasInnerRef.current.style.transition = ''
+    }))
+  }
+
+  // ── Esc to exit preview; Esc to close flyout ─────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (previewMode) { setPreviewMode(false); return }
+        if (leftFlyout !== null) { setLeftFlyout(null); return }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [previewMode, leftFlyout])
+
+  // ── Close flyout on outside mousedown ─────────────────────────────────────────
+  useEffect(() => {
+    if (leftFlyout === null) return
+    function onDown(e: MouseEvent) {
+      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
+        setLeftFlyout(null)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [leftFlyout])
+
   // ── Render ─────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--carbon)', overflow: 'hidden', fontFamily: 'var(--font-ibm)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--carbon)', overflow: 'hidden', fontFamily: 'var(--font-ibm)' }}>
       <style>{`
+        .ce-flyout { position: absolute; left: 56px; top: 0; width: 300px; height: 100%; background: var(--surface); border-right: 1px solid var(--border); z-index: 50; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transform: translateX(-10px); transition: opacity 0.18s ease, transform 0.18s ease; }
+        .ce-flyout.open { opacity: 1; pointer-events: auto; transform: translateX(0); }
+        .ce-dock { width: 0; overflow: hidden; flex-shrink: 0; background: var(--surface); display: flex; flex-direction: column; }
+        .ce-dock.open { width: 280px; border-left: 1px solid var(--border); }
+        .ce-zoom-pill { position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 2px; background: rgba(20,20,18,0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(78,69,56,0.4); border-radius: 999px; padding: 4px 6px; z-index: 15; }
         .ce-mobile-hint { display: none; }
-        .ce-left-toggle { left: 0; transition: left 0.38s cubic-bezier(0.4,0,0.2,1), color 0.15s; }
         @media (max-width: 767px) {
-          .ce-left-aside  { position: absolute !important; top: 0 !important; left: 0 !important; height: 100% !important; z-index: 50 !important; }
-          .ce-left-toggle.open { left: 220px; }
           .ce-mobile-hint { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; background: rgba(182,141,64,0.08); border-bottom: 1px solid rgba(182,141,64,0.15); font-family: var(--font-ibm); font-size: 11px; color: var(--sand); flex-shrink: 0; }
-          .ce-topbar-logo { display: none; }
-          .ce-topbar-tabs { margin-left: 0 !important; }
+          .ce-dock.open { position: fixed; bottom: 0; left: 0; right: 0; width: 100% !important; max-height: 60vh; border-left: none; border-top: 1px solid var(--border); z-index: 40; }
           .ce-topbar-discard { display: none !important; }
           .ce-topbar-divider { display: none !important; }
-          .ce-topbar-save { padding: 6px 12px !important; font-size: 12px !important; }
-          .ce-topbar-right { gap: 4px !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ce-flyout { transition: none; }
         }
       `}</style>
 
       {/* ─── TOP BAR ─────────────────────────────────────────────────────────── */}
+      {!previewMode && (
       <header style={{
         height: 56, display: 'flex', alignItems: 'center',
-        padding: '0 20px', flexShrink: 0,
+        padding: '0 12px', flexShrink: 0,
         background: 'var(--surface)',
         borderBottom: '1px solid var(--border)',
-        gap: 8, zIndex: 20,
+        gap: 6, zIndex: 20,
       }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 16 }}>
-          <svg width="18" height="18" viewBox="0 0 28 28" fill="none" style={{ flexShrink: 0 }}>
-            <circle cx="14" cy="14" r="3.5" fill="var(--candle)"/>
-            <line x1="14" y1="7" x2="14" y2="2"  stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
-            <line x1="14" y1="21" x2="14" y2="26" stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
-            <line x1="7" y1="14" x2="2"  y2="14" stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
-            <line x1="21" y1="14" x2="26" y2="14" stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
-          </svg>
-          <span style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 16, color: 'var(--candle)', letterSpacing: '-0.02em' }}>Lumen</span>
+        {/* Left: Logo + undo/redo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 6 }}>
+            <svg width="18" height="18" viewBox="0 0 28 28" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="14" cy="14" r="3.5" fill="var(--candle)"/>
+              <line x1="14" y1="7" x2="14" y2="2"  stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
+              <line x1="14" y1="21" x2="14" y2="26" stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
+              <line x1="7" y1="14" x2="2"  y2="14" stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
+              <line x1="21" y1="14" x2="26" y2="14" stroke="var(--candle)" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+            <span style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 16, color: 'var(--candle)', letterSpacing: '-0.02em' }}>Lumen</span>
+          </div>
+          <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 4px' }} />
+          <button onClick={performUndo} title="Undo" style={{ ...iconBtn(), width: 30, height: 30 }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5h6a4 4 0 010 8H5M2 5l3-3M2 5l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <button onClick={performRedo} title="Redo" style={{ ...iconBtn(), width: 30, height: 30 }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12 5H6a4 4 0 000 8h3M12 5l-3-3M12 5l-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 2 }}>
-          {([
-            { label: 'Canvas',  active: !isPreview, action: () => setIsPreview(false) },
-            { label: 'Preview', active: isPreview,  action: () => setIsPreview(true)  },
-          ]).map(({ label, active, action }) => (
-            <button
-              key={label}
-              onClick={action}
-              style={{
-                padding: '6px 14px', borderRadius: 8,
-                fontSize: 13, fontWeight: active ? 600 : 400,
-                color: active ? 'var(--candle)' : 'var(--muted)',
-                background: active ? 'rgba(182,141,64,0.08)' : 'transparent',
-                border: 'none', cursor: 'pointer',
-                fontFamily: 'var(--font-ibm)',
-                transition: 'color 0.2s, background 0.2s',
-              }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--sand)' }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--muted)' }}
-            >{label}</button>
-          ))}
+        {/* Center: contextual controls */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden', padding: '0 8px' }}>
+          {!selectedObj && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>1080 × 1350 px</span>
+              <button onClick={() => setLeftFlyout(leftFlyout === 'text' ? null : 'text')}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--sand)', fontSize: 12, fontFamily: 'var(--font-ibm)', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                Add text
+              </button>
+            </div>
+          )}
+          {selIsText && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'nowrap' }}>
+              <select value={fontFamily} onChange={e => updateFontFamily(e.target.value)}
+                style={{ fontFamily: fontFamily, fontSize: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--parchment)', borderRadius: 6, padding: '4px 6px', height: 30 }}>
+                {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </select>
+              <input type="number" min={6} max={300} value={fontSize}
+                onChange={e => { const n = Number(e.target.value); setFontSize(n); updateFontSize(n) }}
+                onBlur={() => pushUndo()}
+                style={{ width: 50, fontSize: 12, textAlign: 'center', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--parchment)', borderRadius: 6, padding: '4px 4px', height: 30 }} />
+              <button onClick={() => { const w = fontWeight === '700' ? '400' : '700'; updateFontWeight(w) }}
+                style={{ ...iconBtn(fontWeight === '700'), width: 30, height: 30, fontWeight: 700, fontSize: 13, fontFamily: 'Georgia, serif' }}
+                onMouseEnter={e => e.currentTarget.style.background = fontWeight === '700' ? 'rgba(182,141,64,0.25)' : 'rgba(78,69,56,0.2)'}
+                onMouseLeave={e => e.currentTarget.style.background = fontWeight === '700' ? 'rgba(182,141,64,0.15)' : 'transparent'}>B</button>
+              <button onClick={updateItalic}
+                style={{ ...iconBtn(isItalic), width: 30, height: 30, fontStyle: 'italic', fontFamily: 'Georgia, serif', fontSize: 14 }}
+                onMouseEnter={e => e.currentTarget.style.background = isItalic ? 'rgba(182,141,64,0.25)' : 'rgba(78,69,56,0.2)'}
+                onMouseLeave={e => e.currentTarget.style.background = isItalic ? 'rgba(182,141,64,0.15)' : 'transparent'}>I</button>
+              <div style={{ position: 'relative', width: 26, height: 26 }}>
+                <input type="color" value={textColor.startsWith('#') ? textColor : '#F6F2EA'} onChange={e => { setTextColor(e.target.value); updateFill(e.target.value) }}
+                  onMouseUp={() => pushUndo()} onBlur={() => pushUndo()}
+                  style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
+                <div style={{ width: 26, height: 26, borderRadius: 5, background: textColor.startsWith('#') ? textColor : '#F6F2EA', border: '2px solid var(--border)' }} />
+              </div>
+              <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
+              <button onClick={() => toggleDock(true, 'properties')} title="More properties" style={{ ...iconBtn(), width: 30, height: 30 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--sand)' }}>···</span>
+              </button>
+              <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
+              <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerUp(id) }} title="Bring forward" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2v8M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerDown(id) }} title="Send backward" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 10V2M9 7l-3 3-3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <button onClick={duplicateSelected} title="Duplicate" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>copy_all</span>
+              </button>
+              <button onClick={deleteSelected} title="Delete" style={{ ...iconBtn(), width: 28, height: 28, color: '#e05252' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,100,80,0.15)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
+              </button>
+            </div>
+          )}
+          {selIsShape && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <div style={{ position: 'relative', width: 26, height: 26 }}>
+                <input type="color" value={fillColor.startsWith('#') ? fillColor : '#b68d40'} onChange={e => { setFillColor(e.target.value); updateFill(e.target.value) }}
+                  onMouseUp={() => pushUndo()} onBlur={() => pushUndo()}
+                  style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
+                <div style={{ width: 26, height: 26, borderRadius: 5, background: fillColor.startsWith('#') ? fillColor : '#b68d40', border: '2px solid var(--border)' }} title="Fill" />
+              </div>
+              <div style={{ position: 'relative', width: 26, height: 26 }}>
+                <input type="color" value={strokeColor.startsWith('#') ? strokeColor : '#000000'} onChange={e => updateStroke(e.target.value, strokeWidth)}
+                  onMouseUp={() => pushUndo()} onBlur={() => pushUndo()}
+                  style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
+                <div style={{ width: 26, height: 26, borderRadius: 5, background: 'transparent', border: `3px solid ${strokeColor.startsWith('#') ? strokeColor : '#000'}` }} title="Stroke" />
+              </div>
+              <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
+              <button onClick={() => toggleDock(true, 'properties')} title="More" style={{ ...iconBtn(), width: 30, height: 30 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--sand)' }}>···</span>
+              </button>
+              <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
+              <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerUp(id) }} title="Bring forward" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2v8M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerDown(id) }} title="Send backward" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 10V2M9 7l-3 3-3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <button onClick={duplicateSelected} title="Duplicate" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>copy_all</span>
+              </button>
+              <button onClick={deleteSelected} title="Delete" style={{ ...iconBtn(), width: 28, height: 28, color: '#e05252' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,100,80,0.15)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
+              </button>
+            </div>
+          )}
+          {selIsImage && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>{Math.round(opacity * 100)}% opacity</span>
+              <button onClick={() => toggleDock(true, 'effects')}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px', background: rightDockTab === 'effects' && rightDockOpen ? 'rgba(182,141,64,0.12)' : 'var(--surface-2)', border: `1px solid ${rightDockTab === 'effects' && rightDockOpen ? 'rgba(182,141,64,0.3)' : 'var(--border)'}`, borderRadius: 6, color: rightDockTab === 'effects' && rightDockOpen ? 'var(--candle)' : 'var(--sand)', fontSize: 12, fontFamily: 'var(--font-ibm)', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => { if (!(rightDockTab === 'effects' && rightDockOpen)) { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--candle)' } }}
+                onMouseLeave={e => { if (!(rightDockTab === 'effects' && rightDockOpen)) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' } }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+                Effects
+              </button>
+              <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
+              <button onClick={() => toggleDock(true, 'properties')} title="More" style={{ ...iconBtn(), width: 30, height: 30 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--sand)' }}>···</span>
+              </button>
+              <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
+              <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerUp(id) }} title="Bring forward" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2v8M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerDown(id) }} title="Send backward" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 10V2M9 7l-3 3-3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <button onClick={duplicateSelected} title="Duplicate" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>copy_all</span>
+              </button>
+              <button onClick={deleteSelected} title="Delete" style={{ ...iconBtn(), width: 28, height: 28, color: '#e05252' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,100,80,0.15)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Right actions */}
-        <div className="ce-topbar-right" style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            className="ce-topbar-discard"
-            onClick={onCancel}
-            style={{
-              background: 'transparent', border: '1px solid var(--border)',
-              color: 'var(--sand)', padding: '6px 16px', borderRadius: 20,
-              cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13, fontWeight: 500,
-              transition: 'all 0.15s',
-            }}
+        {/* Right: Preview + Save + Close */}
+        <div className="ce-topbar-right" style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          <button onClick={() => setPreviewMode(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--sand)', fontSize: 12, fontFamily: 'var(--font-ibm)', cursor: 'pointer', transition: 'all 0.15s' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,0.4)'; e.currentTarget.style.color = 'var(--parchment)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-          >
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
+            Preview
+          </button>
+          <button className="ce-topbar-discard" onClick={onCancel}
+            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--sand)', padding: '6px 14px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13, fontWeight: 500, transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,0.4)'; e.currentTarget.style.color = 'var(--parchment)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
             Discard
           </button>
-          <button
-            className="ce-topbar-save"
-            onClick={handleSave}
-            disabled={saving || !ready}
-            style={{
-              background: 'linear-gradient(135deg, var(--candle), var(--ember))',
-              color: '#fff', border: 'none', padding: '6px 20px', borderRadius: 20,
-              cursor: saving ? 'not-allowed' : 'pointer',
-              fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 13,
-              opacity: !ready ? 0.5 : 1,
-              boxShadow: '0 2px 16px rgba(182,141,64,0.25)',
-              transition: 'opacity 0.15s, transform 0.1s',
-            }}
+          <button className="ce-topbar-save" onClick={handleSave} disabled={saving || !ready}
+            style={{ background: 'linear-gradient(135deg, var(--candle), var(--ember))', color: '#fff', border: 'none', padding: '6px 18px', borderRadius: 20, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 13, opacity: !ready ? 0.5 : 1, boxShadow: '0 2px 16px rgba(182,141,64,0.25)', transition: 'opacity 0.15s, transform 0.1s' }}
             onMouseEnter={e => { if (!saving && ready) e.currentTarget.style.transform = 'scale(1.03)' }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
-          >
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
             {saving ? 'Saving…' : 'Save Design'}
           </button>
-
-          <div className="ce-topbar-divider" style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
-
-          <button
-            onClick={onCancel}
-            style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 6, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 0.15s' }}
-            title="Close editor"
+          <div className="ce-topbar-divider" style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 2px' }} />
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 6, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 0.15s' }} title="Close editor"
             onMouseEnter={e => e.currentTarget.style.color = 'var(--parchment)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
-          >
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         </div>
       </header>
+      )}
 
       {/* Mobile hint */}
       <div className="ce-mobile-hint">
@@ -1986,422 +2129,180 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
         For the best editing experience, use a desktop browser
       </div>
 
-      {/* ─── BODY ─────────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      {/* ─── BODY ROW ────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
 
-        {/* ─── LEFT SIDEBAR ─────────────────────────────────────────────────── */}
-        <aside className="ce-left-aside" style={{
-          width: (isPreview || !leftSidebarOpen) ? 0 : 220,
-          flexShrink: 0,
-          background: 'var(--surface)',
-          borderRight: (isPreview || !leftSidebarOpen) ? 'none' : '1px solid var(--border)',
-          display: 'flex', flexDirection: 'column',
-          overflowY: 'auto',
-          overflow: 'hidden',
-          opacity: (isPreview || !leftSidebarOpen) ? 0 : 1,
-          pointerEvents: (isPreview || !leftSidebarOpen) ? 'none' : 'auto',
-          transition: 'width 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease',
-        }}>
-          {/* Sidebar header */}
-          <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            <div style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 14, color: 'var(--parchment)' }}>Editor</div>
-            <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>Canvas v1</div>
-          </div>
+        {/* ─── LEFT RAIL (56px) ────────────────────────────────────────────────── */}
+        {!previewMode && (<>
+        <div style={{ width: 56, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 8, paddingBottom: 8, gap: 2, zIndex: 51, overflow: 'hidden' }}>
+          {([
+            { id: 'text',   icon: 'title',    label: 'Text'   },
+            { id: 'media',  icon: 'image',    label: 'Media'  },
+            { id: 'shapes', icon: 'category', label: 'Shapes' },
+            { id: 'layers', icon: 'layers',   label: 'Layers' },
+          ] as const).map(({ id, icon, label }) => {
+            const active = leftFlyout === id
+            return (
+              <button key={id} onClick={() => setLeftFlyout(active ? null : id)} title={label}
+                style={{ width: 44, height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, background: active ? 'rgba(182,141,64,0.12)' : 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', color: active ? 'var(--candle)' : 'var(--muted)', transition: 'all 0.15s' }}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(78,69,56,0.15)'; e.currentTarget.style.color = 'var(--sand)' } }}
+                onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--muted)' } }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>{icon}</span>
+                <span style={{ fontSize: 8, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</span>
+              </button>
+            )
+          })}
+          <div style={{ flex: 1 }} />
+          <button onClick={openAssetPicker} title="New Asset"
+            style={{ width: 44, height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', color: 'var(--candle)', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(182,141,64,0.1)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_photo_alternate</span>
+            <span style={{ fontSize: 8, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Asset</span>
+          </button>
+        </div>
 
-          {/* Nav items */}
-          <nav style={{ flex: 1, paddingTop: 8 }}>
-            {([
-              { id: 'canvas',  label: 'Canvas',  icon: 'dashboard' },
-              { id: 'text',    label: 'Text',    icon: 'title' },
-              { id: 'media',   label: 'Media',   icon: 'image' },
-              { id: 'shapes',  label: 'Shapes',  icon: 'category' },
-              { id: 'layers',  label: 'Layers',  icon: 'layers' },
-            ] as const).map(({ id, label, icon }) => (
-              <div
-                key={id}
-                onClick={() => setActiveLeftTab(id)}
-                style={navItem(activeLeftTab === id)}
-                onMouseEnter={e => {
-                  if (activeLeftTab !== id) {
-                    e.currentTarget.style.color = 'var(--candle)'
-                    e.currentTarget.style.background = 'rgba(182,141,64,0.05)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (activeLeftTab !== id) {
-                    e.currentTarget.style.color = 'var(--muted)'
-                    e.currentTarget.style.background = 'transparent'
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{icon}</span>
-                <span>{label}</span>
-              </div>
-            ))}
-          </nav>
+        {/* ─── FLYOUT DRAWER (absolute in body row, not inside rail) ───────────── */}
+        <div className={`ce-flyout${leftFlyout ? ' open' : ''}`} ref={flyoutRef}>
+            <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 13, color: 'var(--parchment)', textTransform: 'capitalize' }}>{leftFlyout ?? ''}</span>
+              <button onClick={() => setLeftFlyout(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', alignItems: 'center', padding: 2 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
 
-          {/* Tab content */}
-          <div style={{ borderTop: '1px solid var(--border)', flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-
-            {activeLeftTab === 'canvas' && (
-              <div style={{ padding: '8px 16px' }}>
-                <span style={sectionLabel}>Canvas Info</span>
-                <div style={{ ...panel, padding: '12px 14px' }}>
-                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', lineHeight: 1.8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--muted)' }}>Size</span><span>1080 × 1350</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--muted)' }}>Ratio</span><span>4 : 5</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--muted)' }}>Zoom</span><span>{Math.round(canvasScale * 100)}%</span></div>
-                  </div>
-                </div>
-                <span style={{ ...sectionLabel, marginTop: 8 }}>Alignment</span>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {[
-                    { label: 'Center H', action: centerH },
-                    { label: 'Center V', action: centerV },
-                    { label: 'Center', action: centerBoth },
-                  ].map(({ label, action }) => (
-                    <button
-                      key={label}
-                      onClick={action}
-                      disabled={!selectedObj}
-                      style={{
-                        flex: 1, padding: '8px 6px',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8, color: 'var(--sand)',
-                        fontSize: 11, fontFamily: 'var(--font-ibm)',
-                        cursor: selectedObj ? 'pointer' : 'not-allowed',
-                        opacity: selectedObj ? 1 : 0.4,
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { if (selectedObj) { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' } }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-                    >{label}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeLeftTab === 'text' && (
-              <div style={{ padding: '8px 16px' }}>
-                <span style={sectionLabel}>Add Text</span>
-                <button
-                  onClick={() => addLayer('textbox')}
-                  disabled={!ready}
-                  style={{
-                    width: '100%', padding: '10px 14px', marginBottom: 16,
-                    background: 'var(--surface-2)', border: '1.5px dashed var(--border)',
-                    borderRadius: 10, color: 'var(--sand)',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13,
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
-                  Add text layer
-                </button>
-                <span style={sectionLabel}>Font Presets</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {FONTS.map(f => (
-                    <div
-                      key={f.value}
-                      onClick={() => { addLayer('textbox').then(() => updateFontFamily(f.value)) }}
-                      style={{
-                        padding: '8px 12px', borderRadius: 8,
-                        background: 'var(--surface-2)', border: '1px solid var(--border)',
-                        cursor: 'pointer', fontSize: 13,
-                        fontFamily: f.value,
-                        color: 'var(--sand)',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-                    >
-                      {f.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeLeftTab === 'media' && (
-              <div style={{ padding: '8px 16px' }}>
-                <span style={sectionLabel}>Upload Image</span>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  style={{ display: 'none' }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = '' }}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={!ready || uploading}
-                  style={{
-                    width: '100%', padding: '12px 14px', marginBottom: 16,
-                    background: 'var(--surface-2)', border: '1.5px dashed var(--border)',
-                    borderRadius: 10, color: uploading ? 'var(--candle)' : 'var(--sand)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    cursor: uploading ? 'not-allowed' : 'pointer',
-                    fontFamily: 'var(--font-ibm)', fontSize: 13,
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => { if (!uploading) { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' } }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = uploading ? 'var(--candle)' : 'var(--sand)' }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span>
-                  {uploading ? 'Uploading…' : 'Upload image'}
-                </button>
-
-                <span style={sectionLabel}>Brand Assets</span>
-                {brandAssets.length === 0 && (
-                  <button
-                    onClick={openAssetPicker}
-                    disabled={!ready}
-                    style={{
-                      width: '100%', padding: '9px 14px', marginBottom: 10,
-                      background: 'var(--surface-2)', border: '1px solid var(--border)',
-                      borderRadius: 10, color: 'var(--sand)',
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13,
-                      transition: 'all 0.15s',
-                    }}
+              {leftFlyout === 'text' && (
+                <div style={{ padding: '0 16px' }}>
+                  <button onClick={() => addLayer('textbox')} disabled={!ready}
+                    style={{ width: '100%', padding: '10px 14px', marginBottom: 16, background: 'var(--surface-2)', border: '1.5px dashed var(--border)', borderRadius: 10, color: 'var(--sand)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13, transition: 'all 0.15s' }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>grid_view</span>
-                    Browse brand assets
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                    Add text layer
                   </button>
-                )}
-                {brandAssets.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                    {brandAssets.map(asset => (
-                      <div
-                        key={asset.id}
-                        onClick={() => addImageToCanvas(asset.public_url, asset.public_url)}
-                        title={asset.name ?? 'Asset'}
-                        style={{
-                          cursor: 'pointer', borderRadius: 8, overflow: 'hidden',
-                          aspectRatio: '1', background: 'var(--surface-2)',
-                          border: '1px solid var(--border)', transition: 'border-color .15s',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--candle)'}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={asset.public_url} alt={asset.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <span style={sectionLabel}>Font Presets</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {FONTS.map(f => (
+                      <div key={f.value}
+                        onClick={() => { addLayer('textbox').then(() => updateFontFamily(f.value)) }}
+                        style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 13, fontFamily: f.value, color: 'var(--sand)', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
+                        {f.label}
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {activeLeftTab === 'shapes' && (
-              <div style={{ padding: '8px 16px' }}>
-                <span style={sectionLabel}>Add Shape</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {([
-                    { label: 'Rectangle', type: 'rect',   icon: 'rectangle', desc: 'Rounded or sharp' },
-                    { label: 'Circle',    type: 'circle', icon: 'circle',    desc: 'Oval or perfect' },
-                  ] as const).map(({ label, type, icon, desc }) => (
-                    <button
-                      key={type}
-                      onClick={() => addLayer(type)}
-                      disabled={!ready}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '12px 14px',
-                        background: 'var(--surface-2)', border: '1px solid var(--border)',
-                        borderRadius: 10, cursor: 'pointer',
-                        textAlign: 'left', transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--candle)' }}>{icon}</span>
-                      <div>
-                        <div style={{ fontSize: 13, color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', fontWeight: 500 }}>{label}</div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>{desc}</div>
-                      </div>
+              {leftFlyout === 'media' && (
+                <div style={{ padding: '0 16px' }}>
+                  <span style={sectionLabel}>Upload Image</span>
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = '' }} />
+                  <button onClick={() => fileInputRef.current?.click()} disabled={!ready || uploading}
+                    style={{ width: '100%', padding: '12px 14px', marginBottom: 16, background: 'var(--surface-2)', border: '1.5px dashed var(--border)', borderRadius: 10, color: uploading ? 'var(--candle)' : 'var(--sand)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13, transition: 'all 0.15s' }}
+                    onMouseEnter={e => { if (!uploading) { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' } }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = uploading ? 'var(--candle)' : 'var(--sand)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span>
+                    {uploading ? 'Uploading…' : 'Upload image'}
+                  </button>
+                  <span style={sectionLabel}>Brand Assets</span>
+                  {brandAssets.length === 0 ? (
+                    <button onClick={openAssetPicker} disabled={!ready}
+                      style={{ width: '100%', padding: '9px 14px', marginBottom: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--sand)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13, transition: 'all 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>grid_view</span>
+                      Browse brand assets
                     </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeLeftTab === 'layers' && (
-              <div style={{ padding: '8px 16px' }}>
-                <span style={sectionLabel}>Layer Stack</span>
-                {layers.length === 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', padding: '12px 0' }}>No layers yet</div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {layers.map((layer, i) => {
-                    const isSelected = selectedObj && (selectedObj.lumenId ?? selectedObj.type) === layer.lumenId
-                    return (
-                      <div
-                        key={layer.lumenId + i}
-                        onClick={() => selectLayer(layer.lumenId)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '8px 10px', borderRadius: 10,
-                          background: isSelected ? 'rgba(182,141,64,0.1)' : 'var(--surface-2)',
-                          border: `1px solid ${isSelected ? 'rgba(182,141,64,0.3)' : 'var(--border)'}`,
-                          cursor: 'pointer', transition: 'all 0.12s',
-                        }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: isSelected ? 'var(--candle)' : 'var(--muted)', flexShrink: 0 }}>
-                          {layerIcon(layer.type, layer.lumenId)}
-                        </span>
-                        <span style={{ flex: 1, fontSize: 11, color: isSelected ? 'var(--parchment)' : 'var(--sand)', fontFamily: 'var(--font-ibm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {layer.lumenId}
-                        </span>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
-                          <button
-                            onClick={e => { e.stopPropagation(); moveLayerUp(layer.lumenId) }}
-                            disabled={i === 0}
-                            style={{ background: 'none', border: 'none', color: i === 0 ? 'var(--muted)' : 'var(--sand)', cursor: i === 0 ? 'default' : 'pointer', padding: '1px 3px', fontSize: 9, lineHeight: 1 }}
-                          >▲</button>
-                          <button
-                            onClick={e => { e.stopPropagation(); moveLayerDown(layer.lumenId) }}
-                            disabled={i === layers.length - 1}
-                            style={{ background: 'none', border: 'none', color: i === layers.length - 1 ? 'var(--muted)' : 'var(--sand)', cursor: i === layers.length - 1 ? 'default' : 'pointer', padding: '1px 3px', fontSize: 9, lineHeight: 1 }}
-                          >▼</button>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                      {brandAssets.map(asset => (
+                        <div key={asset.id} onClick={() => addImageToCanvas(asset.public_url, asset.public_url)} title={asset.name ?? 'Asset'}
+                          style={{ cursor: 'pointer', borderRadius: 8, overflow: 'hidden', aspectRatio: '1', background: 'var(--surface-2)', border: '1px solid var(--border)', transition: 'border-color .15s' }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--candle)'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={asset.public_url} alt={asset.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         </div>
-                      </div>
-                    )
-                  })}
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* New Asset button at bottom */}
-          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-            <button
-              onClick={() => { setActiveLeftTab('media'); openAssetPicker() }}
-              style={{
-                width: '100%', padding: '9px 0',
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                borderRadius: 10, color: 'var(--candle)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 12, fontWeight: 600,
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(182,141,64,0.08)'; e.currentTarget.style.borderColor = 'var(--candle)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
-              New Asset
-            </button>
-          </div>
-        </aside>
+              {leftFlyout === 'shapes' && (
+                <div style={{ padding: '0 16px' }}>
+                  <span style={sectionLabel}>Add Shape</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {([
+                      { label: 'Rectangle', type: 'rect',   icon: 'rectangle', desc: 'Rounded or sharp' },
+                      { label: 'Circle',    type: 'circle', icon: 'circle',    desc: 'Oval or perfect'  },
+                    ] as const).map(({ label, type, icon, desc }) => (
+                      <button key={type} onClick={() => addLayer(type)} disabled={!ready}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--candle)'}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--candle)' }}>{icon}</span>
+                        <div>
+                          <div style={{ fontSize: 13, color: 'var(--parchment)', fontFamily: 'var(--font-ibm)', fontWeight: 500 }}>{label}</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>{desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-        {/* ─── CANVAS AREA ─────────────────────────────────────────────────────── */}
-        <main style={{
-          flex: 1, display: 'flex', flexDirection: 'column',
-          overflow: 'hidden', position: 'relative',
-          background: isPreview ? 'var(--carbon)' : 'var(--surface-3)',
-          transition: 'background 0.4s ease',
-        }}>
-          {/* Canvas toolbar — hidden in preview */}
-          <div style={{
-            height: isPreview ? 0 : 44,
-            display: 'flex', alignItems: 'center',
-            padding: isPreview ? 0 : '0 16px', flexShrink: 0,
-            background: 'var(--surface)',
-            borderBottom: isPreview ? 'none' : '1px solid var(--border)',
-            gap: 4,
-            overflow: 'hidden',
-            opacity: isPreview ? 0 : 1,
-            pointerEvents: isPreview ? 'none' : 'auto',
-            transition: 'height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',
-          }}>
-            <button
-              onClick={performUndo}
-              title="Undo"
-              style={{ ...iconBtn(), width: 32, height: 32 }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 5h6a4 4 0 010 8H5M2 5l3-3M2 5l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            <button
-              onClick={performRedo}
-              title="Redo"
-              style={{ ...iconBtn(), width: 32, height: 32 }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12 5H6a4 4 0 000 8h3M12 5l-3-3M12 5l-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-
-            <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 6px' }} />
-
-            <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>1080 × 1350 px</span>
-
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
-              <button style={{ ...iconBtn(), width: 32, height: 32 }} title="Zoom out"
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                onClick={() => {
-                  const newScale = Math.max(0.1, canvasScale - 0.1)
-                  manualZoom.current = true
-                  const outer = canvasOuterRef.current
-                  const inner = canvasInnerRef.current
-                  if (outer) { outer.style.width = `${DISPLAY_WIDTH * newScale}px`; outer.style.height = `${DISPLAY_HEIGHT * newScale}px` }
-                  if (inner) inner.style.transform = `scale(${newScale})`
-                  canvasScaleRef.current = newScale
-                  setCanvasScale(newScale)
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>zoom_out</span>
-              </button>
-              <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', minWidth: 36, textAlign: 'center' }}>
-                {Math.round(canvasScale * 100)}%
-              </span>
-              <button style={{ ...iconBtn(), width: 32, height: 32 }} title="Zoom in"
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                onClick={() => {
-                  const newScale = Math.min(2, canvasScale + 0.1)
-                  manualZoom.current = true
-                  const outer = canvasOuterRef.current
-                  const inner = canvasInnerRef.current
-                  if (outer) { outer.style.width = `${DISPLAY_WIDTH * newScale}px`; outer.style.height = `${DISPLAY_HEIGHT * newScale}px` }
-                  if (inner) inner.style.transform = `scale(${newScale})`
-                  canvasScaleRef.current = newScale
-                  setCanvasScale(newScale)
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>zoom_in</span>
-              </button>
-              <button
-                style={{ ...iconBtn(), width: 32, height: 32, background: leftSidebarOpen ? 'rgba(182,141,64,0.12)' : 'transparent', color: leftSidebarOpen ? 'var(--candle)' : 'var(--muted)' }}
-                title="Toggle panel"
-                onClick={() => setLeftSidebarOpen(v => !v)}
-                onMouseEnter={e => { if (!leftSidebarOpen) e.currentTarget.style.background = 'rgba(78,69,56,0.2)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = leftSidebarOpen ? 'rgba(182,141,64,0.12)' : 'transparent' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>grid_view</span>
-              </button>
+              {leftFlyout === 'layers' && (
+                <div style={{ padding: '0 16px' }}>
+                  <span style={sectionLabel}>Layer Stack</span>
+                  {layers.length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', padding: '12px 0' }}>No layers yet</div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {layers.map((layer, i) => {
+                      const isSelected = selectedObj && (selectedObj.lumenId ?? selectedObj.type) === layer.lumenId
+                      return (
+                        <div key={layer.lumenId + i} onClick={() => selectLayer(layer.lumenId)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: isSelected ? 'rgba(182,141,64,0.1)' : 'var(--surface-2)', border: `1px solid ${isSelected ? 'rgba(182,141,64,0.3)' : 'var(--border)'}`, cursor: 'pointer', transition: 'all 0.12s' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: isSelected ? 'var(--candle)' : 'var(--muted)', flexShrink: 0 }}>{layerIcon(layer.type, layer.lumenId)}</span>
+                          <span style={{ flex: 1, fontSize: 11, color: isSelected ? 'var(--parchment)' : 'var(--sand)', fontFamily: 'var(--font-ibm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{layer.lumenId}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+                            <button onClick={e => { e.stopPropagation(); moveLayerUp(layer.lumenId) }} disabled={i === 0}
+                              style={{ background: 'none', border: 'none', color: i === 0 ? 'var(--muted)' : 'var(--sand)', cursor: i === 0 ? 'default' : 'pointer', padding: '1px 3px', fontSize: 9, lineHeight: 1 }}>▲</button>
+                            <button onClick={e => { e.stopPropagation(); moveLayerDown(layer.lumenId) }} disabled={i === layers.length - 1}
+                              style={{ background: 'none', border: 'none', color: i === layers.length - 1 ? 'var(--muted)' : 'var(--sand)', cursor: i === layers.length - 1 ? 'default' : 'pointer', padding: '1px 3px', fontSize: 9, lineHeight: 1 }}>▼</button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+        </>)}
 
-          {/* Canvas wrapper — scroll root */}
-          <div ref={canvasAreaRef} style={{
-            flex: 1, overflow: 'auto', position: 'relative',
-          }}>
+        {/* ─── CANVAS WRAPPER (flex:1 — pushes with dock) ─────────────────────── */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: previewMode ? 'var(--carbon)' : 'var(--surface-3)', transition: 'background 0.4s ease' }}>
+
+          {/* Flyout backdrop */}
+          {leftFlyout !== null && !previewMode && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 49 }} onClick={() => setLeftFlyout(null)} />
+          )}
+
+          {/* Canvas scroll root */}
+          <div ref={canvasAreaRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
             {/* Inner centering shell — at least fills the scroll viewport */}
             <div style={{
               minWidth: '100%', minHeight: '100%',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',
-              padding: isPreview ? 48 : 32,
-              gap: isPreview ? 28 : 20,
+              padding: previewMode ? 48 : 32,
+              gap: previewMode ? 28 : 20,
               boxSizing: 'border-box',
               transition: 'padding 0.38s cubic-bezier(0.4,0,0.2,1)',
             }}>
@@ -2410,11 +2311,11 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
               position: 'relative', flexShrink: 0,
               width: DISPLAY_WIDTH * canvasScale,
               height: DISPLAY_HEIGHT * canvasScale,
-              boxShadow: isPreview
+              boxShadow: previewMode
                 ? '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.2)'
                 : '0 12px 48px rgba(0,0,0,0.4)',
-              outline: isPreview ? 'none' : '1.5px solid rgba(212,168,75,0.35)',
-              borderRadius: isPreview ? 20 : 4,
+              outline: previewMode ? 'none' : '1.5px solid rgba(212,168,75,0.35)',
+              borderRadius: previewMode ? 20 : 4,
               overflow: 'hidden',
               lineHeight: 0,
               transition: 'border-radius 0.38s cubic-bezier(0.4,0,0.2,1), box-shadow 0.38s ease',
@@ -2481,603 +2382,162 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
             </div>{/* end inner centering shell */}
           </div>{/* end canvasAreaRef scroll root */}
 
-          {/* ─── Fixed bottom bar — floats over the canvas, never scrolls ── */}
-          <div style={{
-            position: 'absolute', bottom: 20, left: 0, right: 0,
-            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', gap: 10,
-            pointerEvents: 'none', zIndex: 20,
-          }}>
-            {isPreview ? (
-              <button
-                onClick={() => setIsPreview(false)}
-                style={{
-                  pointerEvents: 'auto',
-                  background: 'rgba(20, 20, 18, 0.82)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(182,141,64,0.35)',
-                  borderRadius: 999, padding: '10px 24px',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
-                  color: 'var(--sand)',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-ibm)',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  transition: 'all 0.2s',
-                  animation: 'fadeInUp 0.3s ease',
-                }}
+
+          {/* Preview exit button */}
+          {previewMode && (
+            <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 20 }}>
+              <button onClick={() => setPreviewMode(false)}
+                style={{ pointerEvents: 'auto', background: 'rgba(20,20,18,0.82)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(182,141,64,0.35)', borderRadius: 999, padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.35)', color: 'var(--sand)', cursor: 'pointer', fontFamily: 'var(--font-ibm)', fontSize: 13, fontWeight: 500, transition: 'all 0.2s' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,0.7)'; e.currentTarget.style.color = 'var(--parchment)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,0.35)'; e.currentTarget.style.color = 'var(--sand)' }}
-              >
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,0.35)'; e.currentTarget.style.color = 'var(--sand)' }}>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10 4H5a3 3 0 000 6h2M10 4l-2-2M10 4l-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 Exit Preview
               </button>
-            ) : (
-              <div style={{
-                pointerEvents: 'auto',
-                background: 'rgba(20, 20, 18, 0.78)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1px solid rgba(78,69,56,0.4)',
-                borderRadius: 999, padding: '8px 20px',
-                display: 'flex', alignItems: 'center', gap: 20,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-              }}>
-                {/* Hidden fill color picker triggered by Colors button */}
-                <input
-                  ref={colorPickerRef}
-                  type="color"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    if (selectedObj) {
-                      updateFill(e.target.value)
-                      if (isText(selType)) setTextColor(e.target.value)
-                      else setFillColor(e.target.value)
-                    }
-                  }}
-                />
+            </div>
+          )}
 
-                {([
-                  {
-                    icon: 'palette', label: 'Colors', active: false,
-                    action: () => {
-                      if (!selectedObj) return
-                      setLeftSidebarOpen(true)
-                      if (colorPickerRef.current) {
-                        const cur = isText(selType) ? textColor : fillColor
-                        colorPickerRef.current.value = cur.startsWith('#') ? cur : '#b68d40'
-                        colorPickerRef.current.click()
-                      }
-                    },
-                  },
-                  {
-                    icon: 'text_fields', label: 'Type', active: false,
-                    action: () => { setActiveLeftTab('text'); setLeftSidebarOpen(true) },
-                  },
-                  {
-                    icon: 'filter_b_and_w', label: 'Effects', active: showEffects,
-                    action: () => {
-                      // Auto-select the first image layer if nothing is selected
-                      if (!showEffects && !selIsImage) {
-                        const canvas = fabricRef.current
-                        if (canvas) {
-                          const imgObj = canvas.getObjects().find((o: any) => isImage(o.type ?? ''))
-                          if (imgObj) {
-                            canvas.setActiveObject(imgObj)
-                            canvas.renderAll()
-                            setSelectedObj(imgObj)
-                          }
-                        }
-                      }
-                      setShowEffects(v => !v)
-                      setRightPanelMinimized(false)
-                    },
-                  },
-                ]).map(({ icon, label, active, action }) => (
-                  <button
-                    key={label}
-                    onClick={action}
-                    style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: active ? 'var(--candle)' : 'var(--sand)', transition: 'color 0.15s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--candle)'}
-                    onMouseLeave={e => e.currentTarget.style.color = active ? 'var(--candle)' : 'var(--sand)'}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{icon}</span>
-                    <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-ibm)', fontWeight: 700 }}>{label}</span>
-                  </button>
-                ))}
-
-                <div style={{ width: 1, height: 24, background: 'rgba(78,69,56,0.5)' }} />
-
-                <button
-                  onClick={deleteSelected}
-                  disabled={!selectedObj}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                    background: 'none', border: 'none',
-                    cursor: selectedObj ? 'pointer' : 'not-allowed',
-                    color: selectedObj ? '#c0392b' : 'var(--muted)',
-                    transition: 'color 0.15s',
-                  }}
-                  onMouseEnter={e => { if (selectedObj) e.currentTarget.style.color = '#e74c3c' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = selectedObj ? '#c0392b' : 'var(--muted)' }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
-                  <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-ibm)', fontWeight: 700 }}>Clear</span>
-                </button>
-              </div>
-            )}
-          </div>
-        {/* ─── LEFT SIDEBAR TOGGLE TAB ─────────────────────────────────────────── */}
-        {!isPreview && (
-          <button
-            className={`ce-left-toggle${leftSidebarOpen ? ' open' : ''}`}
-            onClick={() => setLeftSidebarOpen(v => !v)}
-            style={{
-              position: 'absolute',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 51,
-              width: 20, height: 44,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderLeft: 'none',
-              borderRadius: '0 6px 6px 0',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--muted)',
-              padding: 0,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--parchment)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
-            title={leftSidebarOpen ? 'Close panel' : 'Open panel'}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-              {leftSidebarOpen ? 'chevron_left' : 'chevron_right'}
-            </span>
-          </button>
-        )}
-
-        {/* ─── RIGHT PANEL TOGGLE TAB ───────────────────────────────────────────── */}
-        {selectedObj && !isPreview && (
-          <button
-            onClick={() => setRightPanelMinimized(v => !v)}
-            style={{
-              position: 'absolute',
-              right: rightPanelMinimized ? 0 : 272,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 31,
-              width: 20, height: 44,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRight: 'none',
-              borderRadius: '6px 0 0 6px',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--muted)',
-              transition: 'right 0.38s cubic-bezier(0.4,0,0.2,1), color 0.15s',
-              padding: 0,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--parchment)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
-            title={rightPanelMinimized ? 'Open panel' : 'Minimise panel'}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-              {rightPanelMinimized ? 'chevron_left' : 'chevron_right'}
-            </span>
-          </button>
-        )}
-
-        {/* ─── RIGHT PROPERTIES / EFFECTS PANEL — absolutely overlays the canvas ── */}
-        <aside className="ce-right-aside" style={{
-          position: 'absolute', right: 0, top: 0, height: '100%',
-          width: (isPreview || !selectedObj || rightPanelMinimized) ? 0 : 272,
-          background: 'var(--surface)',
-          borderLeft: (isPreview || !selectedObj || rightPanelMinimized) ? 'none' : '1px solid var(--border)',
-          display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
-          opacity: (isPreview || !selectedObj || rightPanelMinimized) ? 0 : 1,
-          pointerEvents: (isPreview || !selectedObj || rightPanelMinimized) ? 'none' : 'auto',
-          transition: 'width 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease',
-          zIndex: 30,
-        }}>
-          <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 14, color: 'var(--parchment)' }}>{showEffects ? 'Effects' : 'Properties'}</div>
-            {showEffects && (
-              <button onClick={() => setShowEffects(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', lineHeight: 1, padding: '2px 4px', display: 'flex', alignItems: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+          {/* Zoom pill */}
+          {!previewMode && (
+            <div className="ce-zoom-pill">
+              <button title="Zoom out" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.25)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                onClick={() => {
+                  const newScale = Math.max(0.1, canvasScale - 0.1)
+                  manualZoom.current = true
+                  const outer = canvasOuterRef.current; const inner = canvasInnerRef.current
+                  if (outer) { outer.style.width = `${DISPLAY_WIDTH * newScale}px`; outer.style.height = `${DISPLAY_HEIGHT * newScale}px` }
+                  if (inner) inner.style.transform = `scale(${newScale})`
+                  canvasScaleRef.current = newScale; setCanvasScale(newScale)
+                }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>zoom_out</span>
               </button>
-            )}
-          </div>
+              <span style={{ fontSize: 11, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', minWidth: 36, textAlign: 'center' }}>{Math.round(canvasScale * 100)}%</span>
+              <button title="Zoom in" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.25)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                onClick={() => {
+                  const newScale = Math.min(2, canvasScale + 0.1)
+                  manualZoom.current = true
+                  const outer = canvasOuterRef.current; const inner = canvasInnerRef.current
+                  if (outer) { outer.style.width = `${DISPLAY_WIDTH * newScale}px`; outer.style.height = `${DISPLAY_HEIGHT * newScale}px` }
+                  if (inner) inner.style.transform = `scale(${newScale})`
+                  canvasScaleRef.current = newScale; setCanvasScale(newScale)
+                }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>zoom_in</span>
+              </button>
+              <button title="Fit to screen" style={{ ...iconBtn(), width: 28, height: 28 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.25)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                onClick={() => { manualZoom.current = false; const el = canvasAreaRef.current; if (!el) return; const pad = 64; const W = el.clientWidth - pad * 2; const H = el.clientHeight - pad * 2; const scale = Math.min(W / DISPLAY_WIDTH, H / DISPLAY_HEIGHT, 1); setCanvasScale(Math.max(0.1, scale)) }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>fit_screen</span>
+              </button>
+            </div>
+          )}
+        </div>{/* end canvas wrapper */}
 
-          {showEffects ? (
-          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-            {/* Category icon tabs */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-              {([
-                { id: 'blur',    icon: 'blur_on',       label: 'Blur'    },
-                { id: 'filters', icon: 'filter_b_and_w', label: 'Filters' },
-                { id: 'adjust',  icon: 'tune',          label: 'Adjust'  },
-              ] as const).map(({ id, icon, label }) => {
-                const active = effectsTab === id
+        {/* ─── RIGHT DOCK ──────────────────────────────────────────────────────── */}
+        {!previewMode && (
+        <div className={`ce-dock${rightDockOpen ? ' open' : ''}`}>
+          {/* Dock header */}
+          <div style={{ padding: '14px 16px 0', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              {(['properties', 'effects'] as const).map(tab => {
+                if (tab === 'effects' && !selIsImage) return null
+                const active = rightDockTab === tab
                 return (
-                  <button
-                    key={id}
-                    onClick={() => setEffectsTab(id)}
-                    style={{
-                      flex: 1,
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                      padding: '10px 6px',
-                      background: active ? 'rgba(182,141,64,0.14)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${active ? 'rgba(182,141,64,0.45)' : 'rgba(78,69,56,0.35)'}`,
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      color: active ? 'var(--candle)' : 'var(--sand)',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'var(--parchment)' } }}
-                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--sand)' } }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>{icon}</span>
-                    <span style={{ fontSize: 9, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
-                  </button>
+                  <button key={tab} onClick={() => setRightDockTab(tab)}
+                    style={{ flex: 1, padding: '8px 0 10px', background: 'none', border: 'none', borderBottom: `2px solid ${active ? 'var(--candle)' : 'transparent'}`, color: active ? 'var(--candle)' : 'var(--muted)', fontSize: 12, fontFamily: 'var(--font-syne)', fontWeight: active ? 700 : 400, cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s', letterSpacing: '0.02em' }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--sand)' }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--muted)' }}
+                  >{tab}</button>
                 )
               })}
+              <button onClick={() => toggleDock(false)} style={{ width: 28, height: 28, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', marginTop: 2, borderRadius: 4, transition: 'color 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--parchment)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+              </button>
             </div>
-
-            {/* Divider */}
-            <div style={{ height: 1, background: 'rgba(78,69,56,0.35)', marginBottom: 14 }} />
-
-            {/* Blur tab */}
-            {effectsTab === 'blur' && (
-              <>
-                {!selIsImage ? (
-                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textAlign: 'center', padding: '8px 0 4px', lineHeight: 1.7, opacity: 0.7 }}>
-                    Select an image layer<br/>to apply blur
-                  </div>
-                ) : (
-                  <div>
-                    {/* Blur type picker */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, marginBottom: 14 }}>
-                      {([
-                        { id: 'gaussian' as BlurType, label: 'Gaussian', icon: 'blur_on' },
-                        { id: 'motion'   as BlurType, label: 'Motion',   icon: 'motion_blur' },
-                        { id: 'radial'   as BlurType, label: 'Radial',   icon: 'lens_blur' },
-                        { id: 'box'      as BlurType, label: 'Box',      icon: 'blur_linear' },
-                      ]).map(({ id, label, icon }) => {
-                        const active = blurType === id
-                        return (
-                          <button
-                            key={id}
-                            onClick={() => { setBlurType(id); if (effectBlur > 0) applyFilters(effectBlur, id, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) }}
-                            style={{
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                              padding: '8px 4px',
-                              background: active ? 'rgba(182,141,64,0.14)' : 'rgba(255,255,255,0.04)',
-                              border: `1px solid ${active ? 'rgba(182,141,64,0.5)' : 'rgba(78,69,56,0.3)'}`,
-                              borderRadius: 8, cursor: 'pointer',
-                              color: active ? 'var(--candle)' : 'var(--sand)',
-                              transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'var(--parchment)' } }}
-                            onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--sand)' } }}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{icon}</span>
-                            <span style={{ fontSize: 8, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textTransform: 'capitalize' }}>{blurType} Blur</span>
-                      <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace', minWidth: 28, textAlign: 'right' }}>{effectBlur}</span>
-                    </div>
-                    <input type="range" min={0} max={100} step={1} value={effectBlur}
-                      onChange={e => { const v = Number(e.target.value); setEffectBlur(v); applyFilters(v, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) }}
-                      onMouseUp={() => pushUndo()}
-                      style={rangeStyle}
-                    />
-                    {/* Direction slider for motion blur */}
-                    {blurType === 'motion' && effectBlur > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>Direction</span>
-                          <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace' }}>{blurAngle}°</span>
-                        </div>
-                        <input type="range" min={0} max={360} step={1} value={blurAngle}
-                          onChange={e => { const v = Number(e.target.value); setBlurAngle(v); applyFilters(effectBlur, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, v, blurCenterX, blurCenterY, blurInnerRadius) }}
-                          onMouseUp={() => pushUndo()}
-                          style={rangeStyle}
-                        />
-                      </div>
-                    )}
-                    {/* Focal center circle picker for radial blur */}
-                    {blurType === 'radial' && effectBlur > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', display: 'block', marginBottom: 8 }}>Focal Center</span>
-                        <div
-                          style={{
-                            width: '100%', aspectRatio: '2 / 1',
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(78,69,56,0.45)',
-                            borderRadius: 8, position: 'relative', cursor: 'crosshair',
-                            overflow: 'hidden', userSelect: 'none',
-                          }}
-                          onPointerDown={e => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            const cx = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)))
-                            const cy = Math.max(0, Math.min(100, Math.round(((e.clientY - rect.top) / rect.height) * 100)))
-                            setBlurCenterX(cx); setBlurCenterY(cy)
-                            applyFilters(effectBlur, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, cx, cy, blurInnerRadius)
-                            e.currentTarget.setPointerCapture(e.pointerId)
-                          }}
-                          onPointerMove={e => {
-                            if (!(e.buttons & 1)) return
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            const cx = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)))
-                            const cy = Math.max(0, Math.min(100, Math.round(((e.clientY - rect.top) / rect.height) * 100)))
-                            setBlurCenterX(cx); setBlurCenterY(cy)
-                            applyFilters(effectBlur, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, cx, cy, blurInnerRadius)
-                          }}
-                          onPointerUp={() => pushUndo()}
-                        >
-                          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(78,69,56,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(78,69,56,0.3) 1px, transparent 1px)', backgroundSize: '25% 25%', pointerEvents: 'none' }} />
-                          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at ${blurCenterX}% ${blurCenterY}%, rgba(182,141,64,0.15) 0%, transparent 55%)`, pointerEvents: 'none' }} />
-                          <div style={{ position: 'absolute', left: `${blurCenterX}%`, top: `${blurCenterY}%`, transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%', background: 'var(--candle)', border: '2px solid rgba(255,255,255,0.9)', boxShadow: '0 2px 8px rgba(0,0,0,0.5)', pointerEvents: 'none' }} />
-                        </div>
-                        <div style={{ marginTop: 5, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>X: {blurCenterX}%</span><span>Y: {blurCenterY}%</span>
-                        </div>
-                      </div>
-                    )}
-                    {/* Sharp zone slider for radial blur */}
-                    {blurType === 'radial' && effectBlur > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>Sharp Zone</span>
-                          <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace' }}>{blurInnerRadius}%</span>
-                        </div>
-                        <input type="range" min={0} max={100} step={1} value={blurInnerRadius}
-                          onChange={e => { const v = Number(e.target.value); setBlurInnerRadius(v); applyFilters(effectBlur, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, v) }}
-                          onMouseUp={() => pushUndo()}
-                          style={rangeStyle}
-                        />
-                      </div>
-                    )}
-                    {effectBlur > 0 && (
-                      <button
-                        onClick={() => { setEffectBlur(0); setBlurInnerRadius(0); applyFilters(0, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, 0); pushUndo() }}
-                        style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                      >Reset blur</button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Filters tab */}
-            {effectsTab === 'filters' && (
-              <>
-                {!selIsImage ? (
-                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textAlign: 'center', padding: '8px 0 4px', lineHeight: 1.7, opacity: 0.7 }}>
-                    Select an image layer<br/>to apply filters
-                  </div>
-                ) : (
-                  <>
-                    {/* Filter presets grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginBottom: 14 }}>
-                      {FILTER_PRESETS.map(preset => {
-                        const isActive = activePreset === preset.name || (!activePreset && preset.name === 'Normal')
-                        return (
-                          <button
-                            key={preset.name}
-                            onClick={() => {
-                              const next = preset.name === 'Normal' ? null : preset.name
-                              setActivePreset(next)
-                              applyFilters(effectBlur, blurType, effectBW, effectBrightness, effectContrast, next, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius)
-                              pushUndo()
-                            }}
-                            style={{
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                              padding: '7px 4px 6px',
-                              background: isActive ? 'rgba(182,141,64,0.14)' : 'rgba(255,255,255,0.04)',
-                              border: `1px solid ${isActive ? 'rgba(182,141,64,0.55)' : 'rgba(78,69,56,0.3)'}`,
-                              borderRadius: 8, cursor: 'pointer',
-                              transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
-                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-                          >
-                            <div style={{ width: 28, height: 20, borderRadius: 4, background: preset.swatch, border: `1.5px solid ${isActive ? 'rgba(182,141,64,0.5)' : 'rgba(255,255,255,0.1)'}` }} />
-                            <span style={{ fontSize: 8, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: isActive ? 'var(--candle)' : 'var(--sand)', textAlign: 'center', lineHeight: 1.2 }}>
-                              {preset.label}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    <div style={{ height: 1, background: 'rgba(78,69,56,0.35)', marginBottom: 12 }} />
-
-                    {/* Fine-tune sliders — Intensity (preset only), Brightness, Contrast */}
-                    {([
-                      ...(activePreset ? [{ label: 'Intensity', value: filterIntensity, min: 0, max: 200, set: (v: number) => { setFilterIntensity(v); applyFilters(effectBlur, blurType, effectBW, effectBrightness, effectContrast, activePreset, v, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) } }] : []),
-                      { label: 'Brightness', value: effectBrightness, min: -100, max: 100, set: (v: number) => { setEffectBrightness(v); applyFilters(effectBlur, blurType, effectBW, v, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) } },
-                      { label: 'Contrast',   value: effectContrast,   min: -100, max: 100, set: (v: number) => { setEffectContrast(v);   applyFilters(effectBlur, blurType, effectBW, effectBrightness, v, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) } },
-                    ]).map(({ label, value, min, max, set }) => (
-                      <div key={label} style={{ marginBottom: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                          <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>{label}</span>
-                          <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace', minWidth: 28, textAlign: 'right' }}>{label === 'Intensity' ? `${value}%` : value}</span>
-                        </div>
-                        <input type="range" min={min} max={max} step={1} value={value}
-                          onChange={e => set(Number(e.target.value))}
-                          onMouseUp={() => pushUndo()}
-                          style={rangeStyle}
-                        />
-                      </div>
-                    ))}
-                    {(activePreset || effectBW !== 0 || effectBrightness !== 0 || effectContrast !== 0) && (
-                      <button
-                        onClick={() => {
-                          setActivePreset(null); setEffectBW(0); setEffectBrightness(0); setEffectContrast(0); setFilterIntensity(100)
-                          applyFilters(effectBlur, blurType, 0, 0, 0, null, 100, blurAngle, blurCenterX, blurCenterY, blurInnerRadius); pushUndo()
-                        }}
-                        style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                      >Reset filters</button>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            {/* Adjust tab — works on any layer */}
-            {effectsTab === 'adjust' && (
-              <>
-                {!selectedObj ? (
-                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textAlign: 'center', padding: '8px 0 4px', lineHeight: 1.7, opacity: 0.7 }}>
-                    Select a layer<br/>to adjust properties
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>Opacity</span>
-                      <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace', minWidth: 28, textAlign: 'right' }}>{Math.round(opacity * 100)}</span>
-                    </div>
-                    <input type="range" min={0} max={100} step={1} value={Math.round(opacity * 100)}
-                      onChange={e => updateOpacity(Number(e.target.value) / 100)}
-                      onMouseUp={() => pushUndo()}
-                      style={rangeStyle}
-                    />
-                  </div>
-                )}
-              </>
-            )}
           </div>
-          ) : (
-          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
 
+          {/* Properties tab */}
+          {rightDockTab === 'properties' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {!selectedObj && (
-              <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', textAlign: 'center', paddingTop: 40, lineHeight: 1.7 }}>
-                Select an element<br/>to see its properties
+              <div>
+                <span style={sectionLabel}>Canvas</span>
+                <div style={{ ...panel, padding: '12px 14px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', lineHeight: 1.8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--muted)' }}>Size</span><span>1080 × 1350</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--muted)' }}>Ratio</span><span>4 : 5</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--muted)' }}>Zoom</span><span>{Math.round(canvasScale * 100)}%</span></div>
+                  </div>
+                </div>
+                <span style={{ ...sectionLabel, marginTop: 8 }}>Alignment</span>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Center H', action: centerH },
+                    { label: 'Center V', action: centerV },
+                    { label: 'Center', action: centerBoth },
+                  ].map(({ label, action }) => (
+                    <button key={label} onClick={action} disabled={!selectedObj}
+                      style={{ flex: 1, padding: '8px 6px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--sand)', fontSize: 11, fontFamily: 'var(--font-ibm)', cursor: 'pointer', opacity: 0.4, transition: 'all 0.15s' }}
+                    >{label}</button>
+                  ))}
+                </div>
               </div>
             )}
-
             {selectedObj && (
               <>
-                {/* ── TEXT PROPERTIES ── */}
                 {selIsText && (
                   <div style={{ marginBottom: 16 }}>
                     <span style={sectionLabel}>Typography</span>
-
-                    {/* Font family */}
                     <div style={{ ...propRow, flexDirection: 'column', alignItems: 'stretch' }}>
                       <div style={{ ...propLabel, marginBottom: 4 }}>Font Family</div>
-                      <select
-                        value={fontFamily}
-                        onChange={e => updateFontFamily(e.target.value)}
-                        style={{ ...inputStyle, fontFamily: fontFamily }}
-                      >
+                      <select value={fontFamily} onChange={e => updateFontFamily(e.target.value)} style={{ ...inputStyle, fontFamily: fontFamily }}>
                         {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                       </select>
                     </div>
-
-                    {/* Font size */}
                     <div style={{ ...propRow }}>
                       <span style={propLabel}>Size</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <button style={{ ...iconBtn(), width: 26, height: 26 }}
-                          onClick={() => { const n = Math.max(6, fontSize - 1); setFontSize(n); updateFontSize(n); pushUndo() }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
+                        <button style={{ ...iconBtn(), width: 26, height: 26 }} onClick={() => { const n = Math.max(6, fontSize - 1); setFontSize(n); updateFontSize(n); pushUndo() }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <svg width="8" height="2" viewBox="0 0 8 2"><line x1="0" y1="1" x2="8" y2="1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                         </button>
-                        <input
-                          type="number" min={6} max={300} value={fontSize}
-                          onChange={e => { const n = Number(e.target.value); setFontSize(n); updateFontSize(n) }}
-                          onBlur={() => pushUndo()}
-                          style={{ ...inputStyle, width: 52, textAlign: 'center', padding: '4px 4px' }}
-                        />
-                        <button style={{ ...iconBtn(), width: 26, height: 26 }}
-                          onClick={() => { const n = fontSize + 1; setFontSize(n); updateFontSize(n); pushUndo() }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
+                        <input type="number" min={6} max={300} value={fontSize} onChange={e => { const n = Number(e.target.value); setFontSize(n); updateFontSize(n) }} onBlur={() => pushUndo()} style={{ ...inputStyle, width: 52, textAlign: 'center', padding: '4px 4px' }} />
+                        <button style={{ ...iconBtn(), width: 26, height: 26 }} onClick={() => { const n = fontSize + 1; setFontSize(n); updateFontSize(n); pushUndo() }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <svg width="8" height="8" viewBox="0 0 8 8"><line x1="4" y1="0" x2="4" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="0" y1="4" x2="8" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                         </button>
                       </div>
                     </div>
-
-                    {/* Font weight */}
                     <div style={{ ...propRow, flexDirection: 'column', alignItems: 'stretch' }}>
                       <div style={{ ...propLabel, marginBottom: 4 }}>Weight</div>
-                      <select
-                        value={fontWeight}
-                        onChange={e => updateFontWeight(e.target.value)}
-                        style={{ ...inputStyle, fontFamily: fontFamily, fontWeight: fontWeight as any }}
-                      >
-                        {[
-                          { value: '100', label: 'Thin · 100' },
-                          { value: '200', label: 'ExtraLight · 200' },
-                          { value: '300', label: 'Light · 300' },
-                          { value: '400', label: 'Regular · 400' },
-                          { value: '500', label: 'Medium · 500' },
-                          { value: '600', label: 'SemiBold · 600' },
-                          { value: '700', label: 'Bold · 700' },
-                          { value: '800', label: 'ExtraBold · 800' },
-                          { value: '900', label: 'Black · 900' },
-                        ].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      <select value={fontWeight} onChange={e => updateFontWeight(e.target.value)} style={{ ...inputStyle, fontFamily: fontFamily, fontWeight: fontWeight as any }}>
+                        {[{value:'100',label:'Thin · 100'},{value:'200',label:'ExtraLight · 200'},{value:'300',label:'Light · 300'},{value:'400',label:'Regular · 400'},{value:'500',label:'Medium · 500'},{value:'600',label:'SemiBold · 600'},{value:'700',label:'Bold · 700'},{value:'800',label:'ExtraBold · 800'},{value:'900',label:'Black · 900'}].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </div>
-
-                    {/* Italic + text width */}
                     <div style={propRow}>
                       <span style={propLabel}>Italic</span>
-                      <button
-                        onClick={updateItalic}
-                        style={{ ...iconBtn(isItalic), width: 30, height: 30, fontStyle: 'italic', fontFamily: 'Georgia, serif', fontSize: 14 }}
-                        onMouseEnter={e => e.currentTarget.style.background = isItalic ? 'rgba(182,141,64,0.25)' : 'rgba(78,69,56,0.2)'}
-                        onMouseLeave={e => e.currentTarget.style.background = isItalic ? 'rgba(182,141,64,0.15)' : 'transparent'}
-                      >I</button>
+                      <button onClick={updateItalic} style={{ ...iconBtn(isItalic), width: 30, height: 30, fontStyle: 'italic', fontFamily: 'Georgia, serif', fontSize: 14 }} onMouseEnter={e => e.currentTarget.style.background = isItalic ? 'rgba(182,141,64,0.25)' : 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = isItalic ? 'rgba(182,141,64,0.15)' : 'transparent'}>I</button>
                     </div>
-
-                    {/* Text width */}
                     <div style={propRow}>
                       <span style={propLabel}>Width</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input
-                          type="number" min={20} max={1080} value={textWidth}
-                          onChange={e => updateTextWidth(Number(e.target.value))}
-                          style={{ ...inputStyle, width: 72, textAlign: 'right', padding: '4px 8px' }}
-                        />
+                        <input type="number" min={20} max={1080} value={textWidth} onChange={e => updateTextWidth(Number(e.target.value))} style={{ ...inputStyle, width: 72, textAlign: 'right', padding: '4px 8px' }} />
                         <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', flexShrink: 0 }}>px</span>
                       </div>
                     </div>
-
-                    {/* Color */}
                     <div style={propRow}>
                       <span style={propLabel}>Color</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ position: 'relative', width: 28, height: 28 }}>
-                          <input
-                            key={selectedObj.lumenId + '_tc'} type="color"
-                            value={textColor.startsWith('#') ? textColor : '#F6F2EA'}
-                            onChange={e => { setTextColor(e.target.value); updateFill(e.target.value) }}
-                            style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-                          />
+                          <input key={selectedObj.lumenId + '_tc'} type="color" value={textColor.startsWith('#') ? textColor : '#F6F2EA'} onChange={e => { setTextColor(e.target.value); updateFill(e.target.value) }} onMouseUp={() => pushUndo()} onBlur={() => pushUndo()} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
                           <div style={{ width: 28, height: 28, borderRadius: 6, background: textColor.startsWith('#') ? textColor : '#F6F2EA', border: '2px solid var(--border)' }} />
                         </div>
                         <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'monospace' }}>{textColor.startsWith('#') ? textColor.toUpperCase() : textColor}</span>
                       </div>
                     </div>
-
-                    {/* Alignment */}
                     <div style={propRow}>
                       <span style={propLabel}>Align</span>
                       <div style={{ display: 'flex', gap: 2 }}>
@@ -3086,122 +2546,69 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                           { value: 'center', icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1" y1="2" x2="11" y2="2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="3" y1="5" x2="9" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="1" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="4" y1="11" x2="8" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
                           { value: 'right',  icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1" y1="2" x2="11" y2="2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="4" y1="5" x2="11" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="1" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><line x1="6" y1="11" x2="11" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
                         ] as const).map(({ value, icon }) => (
-                          <button key={value} onClick={() => updateTextAlign(value)}
-                            style={{ ...iconBtn(textAlign === value), width: 30, height: 30 }}
-                            onMouseEnter={e => e.currentTarget.style.background = textAlign === value ? 'rgba(182,141,64,0.25)' : 'rgba(78,69,56,0.2)'}
-                            onMouseLeave={e => e.currentTarget.style.background = textAlign === value ? 'rgba(182,141,64,0.15)' : 'transparent'}
-                          >{icon}</button>
+                          <button key={value} onClick={() => updateTextAlign(value)} style={{ ...iconBtn(textAlign === value), width: 30, height: 30 }} onMouseEnter={e => e.currentTarget.style.background = textAlign === value ? 'rgba(182,141,64,0.25)' : 'rgba(78,69,56,0.2)'} onMouseLeave={e => e.currentTarget.style.background = textAlign === value ? 'rgba(182,141,64,0.15)' : 'transparent'}>{icon}</button>
                         ))}
                       </div>
                     </div>
-
-                    {/* Line height */}
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span style={propLabel}>Line Height</span>
                         <span style={{ fontSize: 12, color: 'var(--parchment)', fontFamily: 'monospace' }}>{lineHeight.toFixed(2)}</span>
                       </div>
-                      <input type="range" min={0.8} max={3} step={0.05} value={lineHeight}
-                        onChange={e => updateLineHeight(Number(e.target.value))}
-                        onMouseUp={() => pushUndo()}
-                        style={rangeStyle}
-                      />
+                      <input type="range" min={0.8} max={3} step={0.05} value={lineHeight} onChange={e => updateLineHeight(Number(e.target.value))} onMouseUp={() => pushUndo()} style={rangeStyle} />
                     </div>
-
-                    {/* Char spacing */}
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span style={propLabel}>Spacing</span>
                         <span style={{ fontSize: 12, color: 'var(--parchment)', fontFamily: 'monospace' }}>{charSpacing}</span>
                       </div>
-                      <input type="range" min={-200} max={800} step={10} value={charSpacing}
-                        onChange={e => updateCharSpacing(Number(e.target.value))}
-                        onMouseUp={() => pushUndo()}
-                        style={rangeStyle}
-                      />
+                      <input type="range" min={-200} max={800} step={10} value={charSpacing} onChange={e => updateCharSpacing(Number(e.target.value))} onMouseUp={() => pushUndo()} style={rangeStyle} />
                     </div>
-
-                    {/* Quick edit textarea */}
                     <div style={{ marginTop: 4 }}>
                       <div style={{ ...propLabel, marginBottom: 6 }}>Content</div>
-                      <textarea
-                        key={selectedObj.lumenId + '_text'}
-                        defaultValue={selectedObj.text}
-                        onChange={e => updateText(e.target.value)}
-                        rows={3}
-                        placeholder="Edit text…"
-                        style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }}
-                      />
+                      <textarea key={selectedObj.lumenId + '_text'} defaultValue={selectedObj.text} onChange={e => updateText(e.target.value)} rows={3} placeholder="Edit text…" style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} />
                     </div>
                   </div>
                 )}
-
-                {/* ── SHAPE PROPERTIES ── */}
                 {selIsShape && (
                   <div style={{ marginBottom: 16 }}>
                     <span style={sectionLabel}>Appearance</span>
-
-                    {/* Fill color */}
                     <div style={propRow}>
                       <span style={propLabel}>Fill</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ position: 'relative', width: 28, height: 28 }}>
-                          <input
-                            key={selectedObj.lumenId + '_fill'} type="color"
-                            value={fillColor.startsWith('#') ? fillColor : '#b68d40'}
-                            onChange={e => { setFillColor(e.target.value); updateFill(e.target.value) }}
-                            style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-                          />
+                          <input key={selectedObj.lumenId + '_fill'} type="color" value={fillColor.startsWith('#') ? fillColor : '#b68d40'} onChange={e => { setFillColor(e.target.value); updateFill(e.target.value) }} onMouseUp={() => pushUndo()} onBlur={() => pushUndo()} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
                           <div style={{ width: 28, height: 28, borderRadius: 6, background: fillColor.startsWith('#') ? fillColor : '#b68d40', border: '2px solid var(--border)' }} />
                         </div>
                         <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'monospace' }}>{fillColor.startsWith('#') ? fillColor.toUpperCase() : fillColor}</span>
                       </div>
                     </div>
-
-                    {/* Stroke */}
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                         <span style={propLabel}>Border</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <div style={{ position: 'relative', width: 24, height: 24 }}>
-                            <input type="color"
-                              value={strokeColor.startsWith('#') ? strokeColor : '#000000'}
-                              onChange={e => updateStroke(e.target.value, strokeWidth)}
-                              style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-                            />
+                            <input type="color" value={strokeColor.startsWith('#') ? strokeColor : '#000000'} onChange={e => updateStroke(e.target.value, strokeWidth)} onMouseUp={() => pushUndo()} onBlur={() => pushUndo()} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
                             <div style={{ width: 24, height: 24, borderRadius: 4, background: strokeColor.startsWith('#') ? strokeColor : '#000', border: '2px solid var(--border)' }} />
                           </div>
-                          <input
-                            type="number" min={0} max={40} value={strokeWidth}
-                            onChange={e => updateStroke(strokeColor, Number(e.target.value))}
-                            style={{ ...inputStyle, width: 56, padding: '4px 8px' }}
-                            placeholder="0"
-                          />
+                          <input type="number" min={0} max={40} value={strokeWidth} onChange={e => updateStroke(strokeColor, Number(e.target.value))} onBlur={() => pushUndo()} style={{ ...inputStyle, width: 56, padding: '4px 8px' }} placeholder="0" />
                         </div>
                       </div>
                     </div>
-
-                    {/* Corner radius — rect only */}
                     {selIsRect && (
                       <div style={{ marginBottom: 10 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                           <span style={propLabel}>Radius</span>
                           <span style={{ fontSize: 12, color: 'var(--parchment)', fontFamily: 'monospace' }}>{Math.round(radius)}px</span>
                         </div>
-                        <input type="range" min={0} max={540} step={4} value={radius}
-                          onChange={e => updateRadius(Number(e.target.value))}
-                          onMouseUp={() => pushUndo()}
-                          style={rangeStyle}
-                        />
+                        <input type="range" min={0} max={540} step={4} value={radius} onChange={e => updateRadius(Number(e.target.value))} onMouseUp={() => pushUndo()} style={rangeStyle} />
                       </div>
                     )}
                   </div>
                 )}
-
-                {/* ── EFFECTS — images only ── */}
                 {selIsImage && (
                   <div style={{ marginBottom: 16 }}>
-                    <span style={sectionLabel}>Effects</span>
+                    <span style={sectionLabel}>Quick Adjustments</span>
                     {([
                       { label: 'Blur',       value: effectBlur,       min: 0,    max: 100, step: 1, set: (v: number) => { setEffectBlur(v);       applyFilters(v,          blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) } },
                       { label: 'B&W',        value: effectBW,         min: 0,    max: 100, step: 1, set: (v: number) => { setEffectBW(v);         applyFilters(effectBlur, blurType, v,        effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) } },
@@ -3213,17 +2620,11 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                           <span style={propLabel}>{label}</span>
                           <span style={{ fontSize: 12, color: 'var(--parchment)', fontFamily: 'monospace' }}>{value}</span>
                         </div>
-                        <input type="range" min={min} max={max} step={step} value={value}
-                          onChange={e => set(Number(e.target.value))}
-                          onMouseUp={() => pushUndo()}
-                          style={rangeStyle}
-                        />
+                        <input type="range" min={min} max={max} step={step} value={value} onChange={e => set(Number(e.target.value))} onMouseUp={() => pushUndo()} style={rangeStyle} />
                       </div>
                     ))}
                   </div>
                 )}
-
-                {/* ── OPACITY — shared ── */}
                 <div style={{ marginBottom: 16 }}>
                   {!selIsText && <span style={sectionLabel}>Appearance</span>}
                   <div style={{ marginBottom: 8 }}>
@@ -3231,78 +2632,36 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
                       <span style={propLabel}>Opacity</span>
                       <span style={{ fontSize: 12, color: 'var(--parchment)', fontFamily: 'monospace' }}>{Math.round(opacity * 100)}%</span>
                     </div>
-                    <input type="range" min={0} max={1} step={0.01} value={opacity}
-                      onChange={e => updateOpacity(Number(e.target.value))}
-                      onMouseUp={() => pushUndo()}
-                      style={rangeStyle}
-                    />
+                    <input type="range" min={0} max={1} step={0.01} value={opacity} onChange={e => updateOpacity(Number(e.target.value))} onMouseUp={() => pushUndo()} style={rangeStyle} />
                   </div>
                 </div>
-
-                {/* ── LAYER ACTIONS ── */}
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerUp(id) }}
-                      title="Bring forward"
-                      style={{
-                        flex: 1, padding: '8px 0',
-                        background: 'var(--surface-2)', border: '1px solid var(--border)',
-                        borderRadius: 8, color: 'var(--sand)',
-                        fontSize: 11, fontFamily: 'var(--font-ibm)', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                        transition: 'all 0.15s',
-                      }}
+                    <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerUp(id) }} title="Bring forward"
+                      style={{ flex: 1, padding: '8px 0', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--sand)', fontSize: 11, fontFamily: 'var(--font-ibm)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, transition: 'all 0.15s' }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-                    >
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
                       <svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 1v8M2 4l3-3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       Forward
                     </button>
-                    <button
-                      onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerDown(id) }}
-                      title="Send backward"
-                      style={{
-                        flex: 1, padding: '8px 0',
-                        background: 'var(--surface-2)', border: '1px solid var(--border)',
-                        borderRadius: 8, color: 'var(--sand)',
-                        fontSize: 11, fontFamily: 'var(--font-ibm)', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                        transition: 'all 0.15s',
-                      }}
+                    <button onClick={() => { const id = selectedObj?.lumenId ?? selectedObj?.type; if (id) moveLayerDown(id) }} title="Send backward"
+                      style={{ flex: 1, padding: '8px 0', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--sand)', fontSize: 11, fontFamily: 'var(--font-ibm)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, transition: 'all 0.15s' }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-                    >
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
                       <svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 9V1M8 6l-3 3-3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       Backward
                     </button>
                   </div>
-                  <button
-                    onClick={duplicateSelected}
-                    style={{
-                      width: '100%', padding: '9px 0',
-                      background: 'var(--surface-2)', border: '1px solid var(--border)',
-                      borderRadius: 8, color: 'var(--sand)',
-                      fontSize: 12, fontFamily: 'var(--font-ibm)', cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
+                  <button onClick={duplicateSelected}
+                    style={{ width: '100%', padding: '9px 0', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--sand)', fontSize: 12, fontFamily: 'var(--font-ibm)', cursor: 'pointer', transition: 'all 0.15s' }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--candle)'; e.currentTarget.style.color = 'var(--parchment)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}
-                  >
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
                     Duplicate Layer
                   </button>
-                  <button
-                    onClick={lockSelected}
-                    style={{
-                      width: '100%', padding: '9px 0',
-                      background: 'transparent', border: '1px solid var(--border)',
-                      borderRadius: 8, color: 'var(--muted)',
-                      fontSize: 12, fontFamily: 'var(--font-ibm)', cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
+                  <button onClick={lockSelected}
+                    style={{ width: '100%', padding: '9px 0', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--muted)', fontSize: 12, fontFamily: 'var(--font-ibm)', cursor: 'pointer', transition: 'all 0.15s' }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,0.3)'; e.currentTarget.style.color = 'var(--sand)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)' }}
-                  >
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)' }}>
                     {selectedObj?.lockMovementX ? 'Unlock Selection' : 'Lock Selection'}
                   </button>
                 </div>
@@ -3310,9 +2669,163 @@ export function CanvasEditor({ templateJson, onSave, onCancel, withExport }: Can
             )}
           </div>
           )}
-        </aside>
-        </main>
-      </div>
+
+          {/* Effects tab */}
+          {rightDockTab === 'effects' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              {([
+                { id: 'blur',    icon: 'blur_on',        label: 'Blur'    },
+                { id: 'filters', icon: 'filter_b_and_w', label: 'Filters' },
+                { id: 'adjust',  icon: 'tune',           label: 'Adjust'  },
+              ] as const).map(({ id, icon, label }) => {
+                const active = effectsTab === id
+                return (
+                  <button key={id} onClick={() => setEffectsTab(id)}
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 6px', background: active ? 'rgba(182,141,64,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(182,141,64,0.45)' : 'rgba(78,69,56,0.35)'}`, borderRadius: 10, cursor: 'pointer', color: active ? 'var(--candle)' : 'var(--sand)', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'var(--parchment)' } }}
+                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--sand)' } }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>{icon}</span>
+                    <span style={{ fontSize: 9, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ height: 1, background: 'rgba(78,69,56,0.35)', marginBottom: 14 }} />
+            {effectsTab === 'blur' && (
+              <>
+                {!selIsImage ? (
+                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textAlign: 'center', padding: '8px 0 4px', lineHeight: 1.7, opacity: 0.7 }}>Select an image layer<br/>to apply blur</div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, marginBottom: 14 }}>
+                      {([
+                        { id: 'gaussian' as BlurType, label: 'Gaussian', icon: 'blur_on' },
+                        { id: 'motion'   as BlurType, label: 'Motion',   icon: 'motion_blur' },
+                        { id: 'radial'   as BlurType, label: 'Radial',   icon: 'lens_blur' },
+                        { id: 'box'      as BlurType, label: 'Box',      icon: 'blur_linear' },
+                      ]).map(({ id, label, icon }) => {
+                        const active = blurType === id
+                        return (
+                          <button key={id} onClick={() => { setBlurType(id); if (effectBlur > 0) applyFilters(effectBlur, id, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) }}
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 4px', background: active ? 'rgba(182,141,64,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(182,141,64,0.5)' : 'rgba(78,69,56,0.3)'}`, borderRadius: 8, cursor: 'pointer', color: active ? 'var(--candle)' : 'var(--sand)', transition: 'all 0.15s' }}
+                            onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'var(--parchment)' } }}
+                            onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--sand)' } }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{icon}</span>
+                            <span style={{ fontSize: 8, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textTransform: 'capitalize' }}>{blurType} Blur</span>
+                      <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace', minWidth: 28, textAlign: 'right' }}>{effectBlur}</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={1} value={effectBlur} onChange={e => { const v = Number(e.target.value); setEffectBlur(v); applyFilters(v, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, blurAngle, blurCenterX, blurCenterY, blurInnerRadius) }} onMouseUp={() => pushUndo()} style={rangeStyle} />
+                    {blurType === 'motion' && effectBlur > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>Direction</span>
+                          <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace' }}>{blurAngle}°</span>
+                        </div>
+                        <input type="range" min={0} max={360} step={1} value={blurAngle} onChange={e => { const v = Number(e.target.value); setBlurAngle(v); applyFilters(effectBlur, blurType, effectBW, effectBrightness, effectContrast, activePreset, filterIntensity, v, blurCenterX, blurCenterY, blurInnerRadius) }} onMouseUp={() => pushUndo()} style={rangeStyle} />
+                      </div>
+                    )}
+                    {blurType === 'radial' && effectBlur > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', display: 'block', marginBottom: 8 }}>Focal Center</span>
+                        <div style={{ width: '100%', aspectRatio: '2 / 1', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(78,69,56,0.45)', borderRadius: 8, position: 'relative', cursor: 'crosshair', overflow: 'hidden', userSelect: 'none' }}
+                          onPointerDown={e => { const rect = e.currentTarget.getBoundingClientRect(); const cx = Math.max(0,Math.min(100,Math.round(((e.clientX-rect.left)/rect.width)*100))); const cy = Math.max(0,Math.min(100,Math.round(((e.clientY-rect.top)/rect.height)*100))); setBlurCenterX(cx); setBlurCenterY(cy); applyFilters(effectBlur,blurType,effectBW,effectBrightness,effectContrast,activePreset,filterIntensity,blurAngle,cx,cy,blurInnerRadius); e.currentTarget.setPointerCapture(e.pointerId) }}
+                          onPointerMove={e => { if (!(e.buttons&1)) return; const rect = e.currentTarget.getBoundingClientRect(); const cx = Math.max(0,Math.min(100,Math.round(((e.clientX-rect.left)/rect.width)*100))); const cy = Math.max(0,Math.min(100,Math.round(((e.clientY-rect.top)/rect.height)*100))); setBlurCenterX(cx); setBlurCenterY(cy); applyFilters(effectBlur,blurType,effectBW,effectBrightness,effectContrast,activePreset,filterIntensity,blurAngle,cx,cy,blurInnerRadius) }}
+                          onPointerUp={() => pushUndo()}>
+                          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(78,69,56,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(78,69,56,0.3) 1px, transparent 1px)', backgroundSize: '25% 25%', pointerEvents: 'none' }} />
+                          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at ${blurCenterX}% ${blurCenterY}%, rgba(182,141,64,0.15) 0%, transparent 55%)`, pointerEvents: 'none' }} />
+                          <div style={{ position: 'absolute', left: `${blurCenterX}%`, top: `${blurCenterY}%`, transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%', background: 'var(--candle)', border: '2px solid rgba(255,255,255,0.9)', boxShadow: '0 2px 8px rgba(0,0,0,0.5)', pointerEvents: 'none' }} />
+                        </div>
+                        <div style={{ marginTop: 5, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>X: {blurCenterX}%</span><span>Y: {blurCenterY}%</span>
+                        </div>
+                      </div>
+                    )}
+                    {blurType === 'radial' && effectBlur > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>Sharp Zone</span>
+                          <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace' }}>{blurInnerRadius}%</span>
+                        </div>
+                        <input type="range" min={0} max={100} step={1} value={blurInnerRadius} onChange={e => { const v = Number(e.target.value); setBlurInnerRadius(v); applyFilters(effectBlur,blurType,effectBW,effectBrightness,effectContrast,activePreset,filterIntensity,blurAngle,blurCenterX,blurCenterY,v) }} onMouseUp={() => pushUndo()} style={rangeStyle} />
+                      </div>
+                    )}
+                    {effectBlur > 0 && (
+                      <button onClick={() => { setEffectBlur(0); setBlurInnerRadius(0); applyFilters(0,blurType,effectBW,effectBrightness,effectContrast,activePreset,filterIntensity,blurAngle,blurCenterX,blurCenterY,0); pushUndo() }}
+                        style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Reset blur</button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {effectsTab === 'filters' && (
+              <>
+                {!selIsImage ? (
+                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textAlign: 'center', padding: '8px 0 4px', lineHeight: 1.7, opacity: 0.7 }}>Select an image layer<br/>to apply filters</div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginBottom: 14 }}>
+                      {FILTER_PRESETS.map(preset => {
+                        const isActive = activePreset === preset.name || (!activePreset && preset.name === 'Normal')
+                        return (
+                          <button key={preset.name} onClick={() => { const next = preset.name === 'Normal' ? null : preset.name; setActivePreset(next); applyFilters(effectBlur,blurType,effectBW,effectBrightness,effectContrast,next,filterIntensity,blurAngle,blurCenterX,blurCenterY,blurInnerRadius); pushUndo() }}
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '7px 4px 6px', background: isActive ? 'rgba(182,141,64,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? 'rgba(182,141,64,0.55)' : 'rgba(78,69,56,0.3)'}`, borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s' }}
+                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}>
+                            <div style={{ width: 28, height: 20, borderRadius: 4, background: preset.swatch, border: `1.5px solid ${isActive ? 'rgba(182,141,64,0.5)' : 'rgba(255,255,255,0.1)'}` }} />
+                            <span style={{ fontSize: 8, fontFamily: 'var(--font-ibm)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: isActive ? 'var(--candle)' : 'var(--sand)', textAlign: 'center', lineHeight: 1.2 }}>{preset.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div style={{ height: 1, background: 'rgba(78,69,56,0.35)', marginBottom: 12 }} />
+                    {([
+                      ...(activePreset ? [{ label: 'Intensity', value: filterIntensity, min: 0, max: 200, set: (v: number) => { setFilterIntensity(v); applyFilters(effectBlur,blurType,effectBW,effectBrightness,effectContrast,activePreset,v,blurAngle,blurCenterX,blurCenterY,blurInnerRadius) } }] : []),
+                      { label: 'Brightness', value: effectBrightness, min: -100, max: 100, set: (v: number) => { setEffectBrightness(v); applyFilters(effectBlur,blurType,effectBW,v,effectContrast,activePreset,filterIntensity,blurAngle,blurCenterX,blurCenterY,blurInnerRadius) } },
+                      { label: 'Contrast',   value: effectContrast,   min: -100, max: 100, set: (v: number) => { setEffectContrast(v);   applyFilters(effectBlur,blurType,effectBW,effectBrightness,v,activePreset,filterIntensity,blurAngle,blurCenterX,blurCenterY,blurInnerRadius) } },
+                    ]).map(({ label, value, min, max, set }) => (
+                      <div key={label} style={{ marginBottom: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                          <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>{label}</span>
+                          <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace', minWidth: 28, textAlign: 'right' }}>{label === 'Intensity' ? `${value}%` : value}</span>
+                        </div>
+                        <input type="range" min={min} max={max} step={1} value={value} onChange={e => set(Number(e.target.value))} onMouseUp={() => pushUndo()} style={rangeStyle} />
+                      </div>
+                    ))}
+                    {(activePreset || effectBW !== 0 || effectBrightness !== 0 || effectContrast !== 0) && (
+                      <button onClick={() => { setActivePreset(null); setEffectBW(0); setEffectBrightness(0); setEffectContrast(0); setFilterIntensity(100); applyFilters(effectBlur,blurType,0,0,0,null,100,blurAngle,blurCenterX,blurCenterY,blurInnerRadius); pushUndo() }}
+                        style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Reset filters</button>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+            {effectsTab === 'adjust' && (
+              <>
+                {!selectedObj ? (
+                  <div style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)', textAlign: 'center', padding: '8px 0 4px', lineHeight: 1.7, opacity: 0.7 }}>Select a layer<br/>to adjust properties</div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--sand)', fontFamily: 'var(--font-ibm)' }}>Opacity</span>
+                      <span style={{ fontSize: 11, color: 'var(--parchment)', fontFamily: 'monospace', minWidth: 28, textAlign: 'right' }}>{Math.round(opacity * 100)}</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={1} value={Math.round(opacity * 100)} onChange={e => updateOpacity(Number(e.target.value) / 100)} onMouseUp={() => pushUndo()} style={rangeStyle} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          )}
+        </div>
+        )}
+      </div>{/* end body row */}
 
       {/* ─── BRAND ASSET PICKER MODAL ─────────────────────────────────────────── */}
       {assetPickerOpen && (

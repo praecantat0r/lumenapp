@@ -18,11 +18,20 @@ function validateAIOutput(text: string): string {
   return text
 }
 
+const LANG_NAMES: Record<string, string> = {
+  en: 'English', sk: 'Slovak', cs: 'Czech',
+  de: 'German', hu: 'Hungarian', fr: 'French', es: 'Spanish',
+}
+function langName(code: string | undefined | null): string {
+  if (!code) return 'English'
+  return LANG_NAMES[code.toLowerCase()] || code
+}
+
 export function buildBrandSystemPrompt(bb: BrandBrain): string {
   const s = (v: string | undefined | null, max = 2000) => sanitizeForPrompt(v, max)
   return `BRAND: ${s(bb.brand_name, 200)}
 Industry: ${s(bb.industry, 200)}
-Language: ${s(bb.language, 100)}
+Language: ${langName(bb.language)}
 Description: ${s(bb.brand_description)}
 Products/Services: ${s(bb.products)}
 Tone: ${bb.tone_keywords?.map(k => s(k, 100)).join(', ')} — ${s(bb.tone_description)}
@@ -72,7 +81,7 @@ ${assetMode ? '   N/A — depth is evaluated through the asset description, not 
    0 = no — the caption would work equally well on a completely different image
 
 4. LANGUAGE (weight ${assetMode ? '0.35' : '0.15'})
-   Is it written entirely in ${sanitizeForPrompt(brandBrain.language, 100)}?
+   Is it written entirely in ${langName(brandBrain.language)}?
    1 = yes
    0 = no — wrong language or mixed
 
@@ -119,17 +128,20 @@ Respond with this exact JSON (replace the placeholder values):
   try {
     const p = JSON.parse(jsonStr)
     const toBin = (v: unknown) => (v === 1 || v === true ? 1 : 0)
-    const score = assetMode
+    const languagePass = toBin(p.language)
+    const rawScore = assetMode
       // Asset post: only visual_match + language + rules, renormalized weights
       ? toBin(p.visual_match) * 0.45 +
-        toBin(p.language)     * 0.35 +
+        languagePass          * 0.35 +
         toBin(p.rules)        * 0.20
       // Original post: full 5-criterion scoring
       : toBin(p.specificity)  * 0.30 +
         toBin(p.depth)        * 0.25 +
         toBin(p.visual_match) * 0.20 +
-        toBin(p.language)     * 0.15 +
+        languagePass          * 0.15 +
         toBin(p.rules)        * 0.10
+    // Hard gate: wrong language always forces a retry when the brand has a language set
+    const score = (languagePass === 0 && brandBrain.language) ? 0 : rawScore
     return {
       score: Math.round(score * 100) / 100,
       feedback: p.feedback || 'No feedback provided.',
@@ -165,14 +177,14 @@ BRAND PROFILE:
 - Topics to cover: ${s(brandBrain.post_topics)}
 - ${hasUserAsset ? `Do NOT add products, services, or claims beyond what is shown in the user-provided asset and scene description. The user's asset is the subject — describe it freely.` : `Never mention: ${s(brandBrain.post_avoid)}`}
 - Slogans: ${s(brandBrain.slogans) || 'None'}
-- Language: ${s(brandBrain.language, 100)}
+- Language: ${langName(brandBrain.language)}
 ${brandBrain.content_ratio ? `- Content mix strategy: ${s(brandBrain.content_ratio)}\n` : ''}${brandBrain.scraped_taglines?.length ? `- Additional taglines from brand website: ${brandBrain.scraped_taglines.map(t => s(t, 200)).join(' · ')}\n` : ''}${brandBrain.scraped_about ? `- About the brand (from their website): ${s(brandBrain.scraped_about, 3000)}\n` : ''}
 </brand_data>
 CRITICAL RULES — you MUST follow these without exception:
-1. LANGUAGE — this is the single most important rule. Write EVERY word in ${s(brandBrain.language, 100)} only. Zero exceptions.
+1. LANGUAGE — this is the single most important rule. Write EVERY word in ${langName(brandBrain.language)} only. Zero exceptions.
    - Do NOT mix in words or phrases from any other language, including closely related ones (e.g. if the language is Slovak, do not use Czech, Russian, Serbian, or Ukrainian words; if the language is Russian, do not use Ukrainian, Bulgarian, or English words; etc.).
-   - Use only the script that is native to ${s(brandBrain.language, 100)} — do not switch scripts mid-caption.
-   - If you are unsure how to express something in ${s(brandBrain.language, 100)}, use a simpler word you are certain about. Never borrow from a similar language as a shortcut.
+   - Use only the script that is native to ${langName(brandBrain.language)} — do not switch scripts mid-caption.
+   - If you are unsure how to express something in ${langName(brandBrain.language)}, use a simpler word you are certain about. Never borrow from a similar language as a shortcut.
    - Re-read every word before outputting — if any word feels like it belongs to a different language, replace it.
 2. ${hasUserAsset
   ? `The user is featuring their own product or content. Write about what the scene description mentions — the product, object, or setting described. You are not limited to the Products/Services list above; the described content is the user's real product, so promote it directly.
@@ -182,7 +194,7 @@ OVERRIDE: The "Never mention" line above does NOT apply when the user has provid
 4. The example captions below are for TONE and VOICE calibration only — their subject matter is irrelevant. Do NOT apply their product framing if it does not match what this brand actually sells.
 5. Do NOT invent any discounts, promotions, or percentages — only use what is explicitly provided in the user prompt.
 
-Write Instagram posts that match this brand voice precisely. Language: ${s(brandBrain.language, 100)} — every single word.
+Write Instagram posts that match this brand voice precisely. Language: ${langName(brandBrain.language)} — every single word.
 ${brandContext?.examples.length ? `
 CAPTION EXAMPLES — calibrate VOICE and TONE only. Do NOT copy. Do NOT reference these products or visuals.
 ${brandContext.examples.map((ex, i) => `
@@ -201,7 +213,7 @@ The caption MUST be directly inspired by and relevant to this scene. Do not writ
 ${assetNote ? `\nPRODUCT/ASSET DETAILS — MANDATORY: The following specific qualities MUST appear explicitly in the caption. Name them directly — do not paraphrase vaguely or bury them in generic language. The reader must clearly understand these exact characteristics:\n${sanitizeForPrompt(assetNote)}\n` : ''}${promoRequirement}
 Requirements:
 - Engaging, authentic, on-brand
-- Language: ${s(brandBrain.language, 100)}
+- Language: ${langName(brandBrain.language)}
 - Tone: ${brandBrain.tone_keywords?.map(k => s(k, 100)).join(', ')}
 - Directly connected to the described scene
 - Soft structure (adapt as needed, do not label paragraphs):
@@ -836,9 +848,9 @@ Write as one cohesive paragraph of clear prose. Aim for 150–250 words. Less is
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. TEMPLATE_LAYERS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   - title: ${postMode === 'services' ? `product-focused benefit statement (max 6 words, in ${sanitizeForPrompt(brandBrain.language, 100)})` : `educational hook or inspiring question about the topic (max 6 words, in ${sanitizeForPrompt(brandBrain.language, 100)})`}
-   - subtitle: ${postMode === 'services' ? `specific feature or result for this product (max 10 words, in ${sanitizeForPrompt(brandBrain.language, 100)})` : `supporting insight that deepens the topic (max 10 words, in ${sanitizeForPrompt(brandBrain.language, 100)})`}
-   - cta: call-to-action (max 4 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
+   - title: ${postMode === 'services' ? `product-focused benefit statement (max 6 words, in ${langName(brandBrain.language)})` : `educational hook or inspiring question about the topic (max 6 words, in ${langName(brandBrain.language)})`}
+   - subtitle: ${postMode === 'services' ? `specific feature or result for this product (max 10 words, in ${langName(brandBrain.language)})` : `supporting insight that deepens the topic (max 10 words, in ${langName(brandBrain.language)})`}
+   - cta: call-to-action (max 4 words, in ${langName(brandBrain.language)})
    - brand_name: "${sanitizeForPrompt(brandBrain.brand_name, 200)}"
 
 Respond ONLY with valid JSON:
@@ -1036,9 +1048,9 @@ One cohesive paragraph, 150–250 words.
 3. TEMPLATE_LAYERS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Write these specifically about the asset featured in this post — not generic brand copy:
-   - title: punchy headline about the featured product (max 6 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
-   - subtitle: supporting line relevant to this specific asset (max 10 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
-   - cta: call-to-action (max 4 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
+   - title: punchy headline about the featured product (max 6 words, in ${langName(brandBrain.language)})
+   - subtitle: supporting line relevant to this specific asset (max 10 words, in ${langName(brandBrain.language)})
+   - cta: call-to-action (max 4 words, in ${langName(brandBrain.language)})
    - brand_name: "${sanitizeForPrompt(brandBrain.brand_name, 200)}"
 
 Respond ONLY with valid JSON:
@@ -1082,7 +1094,7 @@ Image prompt excerpt: ${ex.image_prompt.slice(0, 420)}…`).join('\n')}
 BRAND: ${sanitizeForPrompt(brandBrain.brand_name, 200)}
 Products: ${sanitizeForPrompt(brandBrain.products)}
 Tone: ${brandBrain.tone_keywords?.map(k => sanitizeForPrompt(k, 100)).join(', ')}
-Language: ${sanitizeForPrompt(brandBrain.language, 100)}
+Language: ${langName(brandBrain.language)}
 ${brandBrain.post_avoid ? `Never reference: ${sanitizeForPrompt(brandBrain.post_avoid)}\n` : ''}${buildPromoDirective(brandBrain)}
 ${contextSection}${avoidSection}${buildIndustryPhotographyGuide(category)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1145,9 +1157,9 @@ ${brandBrain.include_people === false ? '— Do NOT include any people, humans, 
 3. TEMPLATE_LAYERS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Text overlays for the design — write these specifically about the product featured in the scene, not generic brand copy:
-   - title: punchy headline about the product (max 6 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
-   - subtitle: supporting benefit or mood line relevant to this specific product (max 10 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
-   - cta: call-to-action (max 4 words, in ${sanitizeForPrompt(brandBrain.language, 100)})
+   - title: punchy headline about the product (max 6 words, in ${langName(brandBrain.language)})
+   - subtitle: supporting benefit or mood line relevant to this specific product (max 10 words, in ${langName(brandBrain.language)})
+   - cta: call-to-action (max 4 words, in ${langName(brandBrain.language)})
    - brand_name: "${sanitizeForPrompt(brandBrain.brand_name, 200)}"
 
 Respond ONLY with valid JSON:

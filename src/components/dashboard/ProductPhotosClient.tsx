@@ -252,7 +252,6 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
 
   // ─ Gallery
   const [photos, setPhotos] = useState<ProductPhoto[]>(initialPhotos)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [galleryFilter, setGalleryFilter] = useState<'all' | 'generating' | 'done'>('all')
 
   // ─ Selection / delete
@@ -275,9 +274,7 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
 
   const pollingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
-  const selectedPhoto = photos.find(p => p.id === selectedId) ?? null
-
-  function setS<K extends keyof SceneSettings>(key: K, val: SceneSettings[K]) {
+function setS<K extends keyof SceneSettings>(key: K, val: SceneSettings[K]) {
     setScene(s => ({ ...s, [key]: val }))
   }
 
@@ -438,7 +435,6 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
       fetch(`/api/product-photos/${id}`, { method: 'DELETE' }).catch(() => {})
     ))
     setPhotos(prev => prev.filter(p => !selectedIds.has(p.id)))
-    if (selectedId && selectedIds.has(selectedId)) setSelectedId(null)
     setSelectedIds(new Set())
     setDeleting(false)
   }
@@ -514,7 +510,6 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
         @keyframes pp-spin { to{transform:rotate(360deg)} }
         .pp-card { position:relative; border-radius:12px; overflow:hidden; aspect-ratio:4/5; background:var(--surface-2); border:1px solid var(--border); cursor:pointer; transition:border-color 200ms,transform 200ms; }
         .pp-card:hover { border-color:rgba(212,168,75,.3); transform:translateY(-2px); }
-        .pp-card.selected { border-color:rgba(212,168,75,.5); box-shadow:0 0 0 1px rgba(212,168,75,.15); }
         .pp-card-overlay { position:absolute; inset:0; background:linear-gradient(to top,rgba(11,10,5,.85) 0%,transparent 55%); opacity:0; transition:opacity 200ms; }
         .pp-card:hover .pp-card-overlay { opacity:1; }
         .pp-card-actions { position:absolute; bottom:10px; left:10px; right:10px; display:flex; gap:6px; opacity:0; transition:opacity 200ms; }
@@ -647,7 +642,7 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
                       {filtered.map(photo => (
-                        <div key={photo.id} className={`pp-card${selectedId === photo.id ? ' selected' : ''}`} onClick={() => setSelectedId(selectedId === photo.id ? null : photo.id)}>
+                        <div key={photo.id} className="pp-card">
                           {/* Selection checkbox */}
                           <div
                             className={`pp-check${selectedIds.has(photo.id) ? ' checked' : ''}`}
@@ -690,6 +685,7 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
                                 <button className="pp-action-btn" onClick={e => { e.stopPropagation(); handleDownload(photo) }}>Download</button>
                                 <button className="pp-action-btn" onClick={e => { e.stopPropagation(); handleGenerateCaption(photo) }}>Captions</button>
                                 <button className="pp-action-btn" onClick={e => { e.stopPropagation(); setEditingPhoto(photo) }}>Edit</button>
+                                <button className="pp-action-btn" onClick={e => { e.stopPropagation(); handleRegenerate(photo) }}>Regen</button>
                               </div>
                             </>
                           )}
@@ -701,50 +697,6 @@ export function ProductPhotosClient({ photos: initialPhotos, brandAssets }: Prop
               </div>
             </div>
 
-            {/* Detail panel */}
-            {selectedPhoto && (
-              <aside style={{ width: 288, flexShrink: 0, borderLeft: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                  <div style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, fontSize: 13, color: 'var(--parchment)' }}>Photo Detail</div>
-                  <button onClick={() => setSelectedId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex' }} onMouseEnter={e => (e.currentTarget.style.color = 'var(--parchment)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}>
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><line x1="13" y1="3" x2="3" y2="13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                  </button>
-                </div>
-                <div style={{ flex: 1, padding: 18, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
-                  {/* Preview */}
-                  {selectedPhoto.image_url && (
-                    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', aspectRatio: '4/5', position: 'relative' }}>
-                      <Image src={selectedPhoto.image_url} alt="Product photo" fill sizes="(max-width: 1024px) 40vw, 320px" style={{ objectFit: 'cover' }} />
-                    </div>
-                  )}
-
-                  {/* Status + date */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <StatusBadge status={selectedPhoto.status} />
-                    <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ibm)' }}>{formatDate(selectedPhoto.created_at)}</span>
-                  </div>
-
-                  {/* Actions */}
-                  {selectedPhoto.status === 'done' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                      <button onClick={() => handleDownload(selectedPhoto)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 7, background: 'var(--candle)', border: 'none', color: '#1a1410', fontFamily: 'var(--font-ibm)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = '#c8983c')} onMouseLeave={e => (e.currentTarget.style.background = 'var(--candle)')}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>Download
-                      </button>
-                      <button onClick={() => handleRegenerate(selectedPhoto)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 7, background: 'transparent', border: '1px solid var(--border)', color: 'var(--sand)', fontFamily: 'var(--font-ibm)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(212,168,75,.3)'; e.currentTarget.style.color = 'var(--parchment)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span>Regenerate
-                      </button>
-                      <button onClick={() => handleGenerateCaption(selectedPhoto)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 7, background: 'transparent', border: '1px solid var(--border)', color: 'var(--sand)', fontFamily: 'var(--font-ibm)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,.3)'; e.currentTarget.style.color = 'var(--candle)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>Captions
-                      </button>
-                      <button onClick={() => setEditingPhoto(selectedPhoto)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 7, background: 'transparent', border: '1px solid var(--border)', color: 'var(--sand)', fontFamily: 'var(--font-ibm)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(182,141,64,.3)'; e.currentTarget.style.color = 'var(--parchment)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--sand)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>Edit in Canvas
-                      </button>
-                    </div>
-                  )}
-
-                </div>
-              </aside>
-            )}
           </>
         )}
 

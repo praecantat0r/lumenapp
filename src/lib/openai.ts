@@ -22,6 +22,15 @@ function validateAIOutput(text: string): string {
   return text
 }
 
+const LANG_NAMES: Record<string, string> = {
+  en: 'English', sk: 'Slovak', cs: 'Czech',
+  de: 'German', hu: 'Hungarian', fr: 'French', es: 'Spanish',
+}
+function langName(code: string | undefined | null): string {
+  if (!code) return 'English'
+  return LANG_NAMES[code.toLowerCase()] || code
+}
+
 export async function generateCaption(brandBrain: BrandBrain, visualConcept: string, brandContext?: BrandContext, feedback?: string): Promise<{ caption: string; hashtags: string }> {
   const s = (v: string | undefined | null, max = 2000) => sanitizeForPrompt(v, max)
 
@@ -40,7 +49,7 @@ BRAND PROFILE:
 - Topics to cover: ${s(brandBrain.post_topics)}
 - Never mention: ${s(brandBrain.post_avoid)}
 - Slogans: ${s(brandBrain.slogans) || 'None'}
-- Language: ${s(brandBrain.language, 100)}
+- Language: ${langName(brandBrain.language)}
 ${brandBrain.content_ratio ? `- Content mix strategy: ${s(brandBrain.content_ratio)}\n` : ''}${brandBrain.scraped_taglines?.length ? `- Additional taglines from brand website: ${brandBrain.scraped_taglines.map(t => s(t, 200)).join(' · ')}\n` : ''}${brandBrain.scraped_about ? `- About the brand (from their website): ${s(brandBrain.scraped_about, 3000)}\n` : ''}
 </brand_data>
 
@@ -76,7 +85,7 @@ Rules to follow:
 2. Ground the caption in the scene description provided below. Write about what the scene describes.
 3. The example captions below are for tone and voice calibration only — do not copy their subject matter.
 4. Do not invent discounts, promotions, or percentages — only use what is explicitly provided.
-5. Write only in ${s(brandBrain.language, 100)}. Do not mix in other languages.
+5. Write only in ${langName(brandBrain.language)}. Do not mix in other languages.
 6. Use short paragraphs separated by blank lines. Keep it readable.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -104,7 +113,7 @@ POST SCENE DESCRIPTION: ${sanitizeForPrompt(visualConcept)}
 The caption must be directly inspired by and relevant to this scene.
 ${promoRequirement}
 Follow the 3-part structure: Hook → Body → Call to Action.
-- Language: ${s(brandBrain.language, 100)}
+- Language: ${langName(brandBrain.language)}
 - Tone: ${brandBrain.tone_keywords?.map(k => s(k, 100)).join(', ')}
 
 Then on a new line write: HASHTAGS: followed by exactly 5–7 relevant hashtags. No more, no less.
