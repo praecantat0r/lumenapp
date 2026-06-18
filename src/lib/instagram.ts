@@ -25,7 +25,25 @@ export async function publishToInstagram(
     throw new Error(`IG container creation failed: ${JSON.stringify(containerData)}`)
   }
 
-  // Step B: Publish container
+  // Step B: Poll until container is ready (Instagram processes the image asynchronously)
+  const MAX_POLLS = 20
+  const POLL_INTERVAL_MS = 3000
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+    const statusRes = await fetch(
+      `${IG_BASE}/${containerData.id}?fields=status_code&access_token=${accessToken}`
+    )
+    const statusData = await statusRes.json()
+    if (statusData.status_code === 'FINISHED') break
+    if (statusData.status_code === 'ERROR') {
+      throw new Error(`IG media container processing failed: ${JSON.stringify(statusData)}`)
+    }
+    if (i === MAX_POLLS - 1) {
+      throw new Error('IG media container timed out waiting to be ready for publishing')
+    }
+  }
+
+  // Step C: Publish container
   const publishRes = await fetch(`${IG_BASE}/me/media_publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
